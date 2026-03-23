@@ -14,6 +14,7 @@ import {buildCombiTable} from "./components/combi-tree.js";
 
 const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
 const kek_raw  = await FileAttachment("data/classificators/KEKV.json").json();
+const fkv_raw  = await FileAttachment("data/classificators/FKV.json").json();
 
 const incomes = await FileAttachment("data/incomes.parquet").parquet()
   .then(t => [...t].map(r => ({
@@ -63,6 +64,10 @@ function prepClassificator(raw, rootName) {
 }
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
+const fkv_prep  = prepClassificator(fkv_raw,  "Загальні видатки");
+
+const kekNameByCode = new Map(kek_prep.map(d => [d.code, d.name]));
+const fkvNameByCode = new Map(fkv_prep.map(d => [d.code, d.name]));
 
 // Capital codes from localStorage (set on Capital Adjustments page)
 const defaultCapIncCodes = [30000000, 42000000, 21050000, 24110000, 21010500, 21010700, 21010800, 21010900];
@@ -446,6 +451,7 @@ const primaryExpensesEcon = filterPrimary(expenses_econ).map(d => ({
   CITY: d.CITY,
   REP_PERIOD: d.REP_PERIOD.toISOString().slice(0, 10),
   COD_CONS_EK: d.COD_CONS_EK,
+  NAME_EK: kekNameByCode.get(d.COD_CONS_EK) ?? "",
   ZAT_AMT: d.ZAT_AMT,
   PLANS_AMT: d.PLANS_AMT,
   FAKT_AMT: d.FAKT_AMT
@@ -455,6 +461,7 @@ const primaryExpensesFunc = filterPrimary(expenses_func).map(d => ({
   CITY: d.CITY,
   REP_PERIOD: d.REP_PERIOD.toISOString().slice(0, 10),
   COD_CONS_MB_FK: d.COD_CONS_MB_FK,
+  NAME_FK: fkvNameByCode.get(d.COD_CONS_MB_FK) ?? "",
   ZAT_AMT: d.ZAT_AMT,
   PLANS_AMT: d.PLANS_AMT,
   FAKT_AMT: d.FAKT_AMT
