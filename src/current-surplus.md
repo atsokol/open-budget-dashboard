@@ -14,7 +14,6 @@ import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
 import {prepareWaterfallData, prepareWaterfallComparisonData, get_codes} from "./components/waterfall-data.js";
 
-const budgetData = await FileAttachment("data/budget-summary.json").json();
 const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
 const kek_raw  = await FileAttachment("data/classificators/KEKV.json").json();
 
@@ -45,12 +44,9 @@ function prepClassificator(raw, rootName) {
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
 
-const data = budgetData.map(d => ({
-  ...d, REP_PERIOD: new Date(d.REP_PERIOD),
-  curr_surplus: d.income_curr - d.expense_curr
-}));
-const cityNames = [...new Set(data.map(d => d.CITY))].sort();
-const availableYears = [...new Set(data.map(d => d.year))].sort();
+// Derive cityNames and availableYears from raw parquet
+const cityNames = [...new Set(incomes.map(d => d.CITY))].sort();
+const availableYears = [...new Set(incomes.map(d => d.REP_PERIOD.getUTCFullYear()))].sort();
 ```
 
 ```js

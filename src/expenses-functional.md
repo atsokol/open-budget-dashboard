@@ -13,7 +13,6 @@ import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.j
 import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 import {Icicle, get_treetab} from "./components/icicle.js";
 
-const budgetData = await FileAttachment("data/budget-summary.json").json();
 const fkv_raw = await FileAttachment("data/classificators/FKV.json").json();
 
 const expenses_func = await FileAttachment("data/expenses-functional.parquet").parquet()
@@ -36,10 +35,21 @@ function prepClassificator(raw, rootName) {
 }
 const fkv_prep = prepClassificator(fkv_raw, "Загальні видатки (функціональні)");
 
-const data = budgetData.map(d => ({
-  ...d, REP_PERIOD: new Date(d.REP_PERIOD),
-  curr_surplus: d.income_curr - d.expense_curr
-}));
+// Aggregate total expense per city/period from raw parquet
+const data = (() => {
+  const agg = {};
+  for (const d of expenses_func) {
+    if (d.FUND_TYP !== "T") continue;
+    const k = `${d.CITY}|${d.REP_PERIOD.getTime()}`;
+    if (!agg[k]) agg[k] = { CITY: d.CITY, REP_PERIOD: d.REP_PERIOD, expense: 0 };
+    agg[k].expense += d.FAKT_AMT || 0;
+  }
+  return Object.values(agg).map(d => ({
+    CITY: d.CITY, REP_PERIOD: d.REP_PERIOD,
+    expense: Math.round(d.expense / 1e6 * 10) / 10,
+    year: d.REP_PERIOD.getUTCFullYear()
+  })).sort((a, b) => a.REP_PERIOD - b.REP_PERIOD);
+})();
 const cityNames = [...new Set(data.map(d => d.CITY))].sort();
 const availableYears = [...new Set(data.map(d => d.year))].sort();
 ```
