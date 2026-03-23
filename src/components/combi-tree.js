@@ -118,17 +118,3 @@ export function buildCombiTable(inck_table, kek_table, capIncSet) {
 
   return hierarchyToTable(tree);
 }
-
-/**
- * Build the current surplus data array by combining curr_inc and curr_exp
- * with the COD field required by waterfall functions.
- * @param {Array} curr_inc - Filtered current income rows
- * @param {Array} curr_exp - Filtered current expense rows (FAKT_AMT is positive)
- * @returns {Array}
- */
-export function buildCurrSurplusData(curr_inc, curr_exp) {
-  return [
-    ...curr_inc.map(d => ({ ...d, COD: d.COD_INCO,    FAKT_AMT: +d.FAKT_AMT })),
-    ...curr_exp.map(d => ({ ...d, COD: d.COD_CONS_EK, FAKT_AMT: -d.FAKT_AMT })),
-  ];
-}
