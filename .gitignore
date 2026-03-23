@@ -2,7 +2,7 @@
 node_modules/
 
 # Observable Framework
-.observablehq/
+src/.observablehq/
 dist/
 
 # Data files (fetched at build time)
