@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Observable Framework
+.observablehq/
+dist/
+
+# Data files (fetched at build time)
+src/data/*.parquet
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
+
+# Env
+.env
+.env.local
+
+# Other 
+notebook/

@@ -1,0 +1,34 @@
+{
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "clean": "rimraf src/.observablehq/cache",
+    "fetch-data": "node src/data/fetch-data.js",
+    "prebuild": "npm run fetch-data",
+    "predev": "npm run fetch-data",
+    "build": "arch -arm64 observable build",
+    "dev": "arch -arm64 observable preview",
+    "deploy": "arch -arm64 observable deploy",
+    "observable": "arch -arm64 observable"
+  },
+  "dependencies": {
+    "@observablehq/framework": "^1.13.3",
+    "@rollup/wasm-node": "^4.60.0",
+    "arquero": "^8.0.3",
+    "d3-dsv": "^3.0.1",
+    "d3-time-format": "^4.1.0",
+    "duckdb": "^1.4.3",
+    "js-yaml": "^4.1.1",
+    "rollup": "^4.55.1"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.60.0",
+    "@rollup/rollup-darwin-x64": "^4.60.0"
+  }
+}
