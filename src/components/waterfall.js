@@ -34,6 +34,7 @@ export function WaterfallChart(data, title, fmt, yLabel = "million UAH") {
       domain: colorDomain,
       range: colorRange
     },
+    marginLeft: 50,
     marks: [
       Plot.barY(data, {
         x: "key",
@@ -78,6 +79,7 @@ export function WaterfallComparisonChart(data, title, fmt, yLabel = "million UAH
       domain: colorDomain,
       range: colorRange
     },
+    marginLeft: 50,
     marks: [
       Plot.barY(data, {
         x: "key",

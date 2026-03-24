@@ -62,7 +62,7 @@ const inck_modified = [
       return {...d, parentCode: synCapIncCode};
     return d;
   }),
-  {code: synCapIncCode, parentCode: 0, name: "Капітальні доходи", level: 1}
+  {code: synCapIncCode, parentCode: 0, name: "Capital revenues", level: 1}
 ];
 
 // Aggregate total income per city/period from raw parquet

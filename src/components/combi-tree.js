@@ -61,7 +61,7 @@ export function buildCombiTable(inck_table, kek_table, capIncSet) {
         children: get_codes_ex(inck_table, [20000000, 50000000]).filter(notCap)
       },
       {
-        name: "Капітальні доходи",
+        name: "Capital revenues",
         code: 300000000,
         children: inck_table
           .filter(d => d.code !== 0 && capIncSet.has(d.code))
