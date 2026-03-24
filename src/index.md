@@ -242,7 +242,7 @@ function aggregateBudget(incData, expData, city, combi) {
       .filter(d => d.CITY === city && d.REP_PERIOD.getUTCFullYear() === yearTo
                 && d.REP_PERIOD.getUTCMonth() === budgetMonth && d.FUND_TYP === "T"
                 && leafCodes.includes(d[codeField]))
-      .reduce((s, d) => s + (d.PLANS_AMT || 0), 0) / 1e6;
+      .reduce((s, d) => s + (d.ZAT_AMT || 0), 0) / 1e6;
     return { name: node.data.name, isIncome, budget: Math.round(val * 10) / 10 };
   });
 }
@@ -286,13 +286,13 @@ const budgetCapInc = budgetMonth >= 0 ? Math.round(incomes
   .filter(d => d.CITY === selectCity && d.REP_PERIOD.getUTCFullYear() === yearTo
             && d.REP_PERIOD.getUTCMonth() === budgetMonth && d.FUND_TYP === "T"
             && capIncSet.has(d.COD_INCO))
-  .reduce((s, d) => s + (d.PLANS_AMT || 0), 0) / 1e6 * 10) / 10 : 0;
+  .reduce((s, d) => s + (d.ZAT_AMT || 0), 0) / 1e6 * 10) / 10 : 0;
 
 const budgetCapExp = budgetMonth >= 0 ? Math.round(expenses_econ
   .filter(d => d.CITY === selectCity && d.REP_PERIOD.getUTCFullYear() === yearTo
             && d.REP_PERIOD.getUTCMonth() === budgetMonth && d.FUND_TYP === "T"
             && capExpSet.has(d.COD_CONS_EK))
-  .reduce((s, d) => s + (d.PLANS_AMT || 0), 0) / 1e6 * 10) / 10 : 0;
+  .reduce((s, d) => s + (d.ZAT_AMT || 0), 0) / 1e6 * 10) / 10 : 0;
 
 const budgetCurrentSurplus = Math.round(
   ((budgetTotInc - budgetCapInc) - (budgetTotExp - budgetCapExp)) * 10
