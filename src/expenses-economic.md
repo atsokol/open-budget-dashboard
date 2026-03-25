@@ -188,7 +188,7 @@ display(WaterfallComparisonChart(exp_wfd, `Expense change: ${selectCity} ${selec
 ## Expense (economic) categories — ${selectCity} ${selectYear}
 
 ```js
-const exp_trtab = get_treetab(expenses_econ, kek_modified, "COD_CONS_EK", selectCity, selectYear, month_max);
+const exp_trtab = get_treetab(expenses_econ, kek_prep, "COD_CONS_EK", selectCity, selectYear, month_max);
 display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
 display(ExcelButton(exp_trtab, `expenses_economic_${selectCity}_${selectYear}.xlsx`, "Expenses (Economic)"))
 ```
@@ -198,7 +198,7 @@ display(ExcelButton(exp_trtab, `expenses_economic_${selectCity}_${selectYear}.xl
 ## Expense (economic) change — ${selectCity} ${selectYear} vs ${baseYear}
 
 ```js
-const exp_diff = get_treetab_diff(expenses_econ, kek_modified, "COD_CONS_EK", selectCity, selectYear, baseYear, month_max);
+const exp_diff = get_treetab_diff(expenses_econ, kek_prep, "COD_CONS_EK", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
 display(ExcelButton(exp_diff, `expenses_economic_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```

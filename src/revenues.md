@@ -214,7 +214,7 @@ display(WaterfallComparisonChart(inc_wfd, `Revenue change: ${selectCity} ${month
 ## Revenue classification — ${selectCity} ${selectYear}
 
 ```js
-const inc_trtab = get_treetab(incomes, inck_modified, "COD_INCO", selectCity, selectYear, month_max);
+const inc_trtab = get_treetab(incomes, inck_prep, "COD_INCO", selectCity, selectYear, month_max);
 display(Icicle(inc_trtab, {label: d => d.name, width: 1152, height: 450}))
 display(ExcelButton(inc_trtab, `revenues_${selectCity}_${selectYear}.xlsx`, "Revenues"))
 ```
@@ -224,7 +224,7 @@ display(ExcelButton(inc_trtab, `revenues_${selectCity}_${selectYear}.xlsx`, "Rev
 ## Revenue change — ${selectCity} ${selectYear} vs ${baseYear}
 
 ```js
-const inc_diff = get_treetab_diff(incomes, inck_modified, "COD_INCO", selectCity, selectYear, baseYear, month_max);
+const inc_diff = get_treetab_diff(incomes, inck_prep, "COD_INCO", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(inc_diff, {label: d => d.name, width: 1152, height: 450}));
 display(ExcelButton(inc_diff, `revenues_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```
