@@ -12,6 +12,7 @@ import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
 import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
+import {ExcelButton} from "./components/excel-export.js";
 
 const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
 
@@ -215,6 +216,7 @@ display(WaterfallComparisonChart(inc_wfd, `Revenue change: ${selectCity} ${month
 ```js
 const inc_trtab = get_treetab(incomes, inck_modified, "COD_INCO", selectCity, selectYear, month_max);
 display(Icicle(inc_trtab, {label: d => d.name, width: 1152, height: 450}))
+display(ExcelButton(inc_trtab, `revenues_${selectCity}_${selectYear}.xlsx`, "Revenues"))
 ```
 
 ---
@@ -224,4 +226,5 @@ display(Icicle(inc_trtab, {label: d => d.name, width: 1152, height: 450}))
 ```js
 const inc_diff = get_treetab_diff(incomes, inck_modified, "COD_INCO", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(inc_diff, {label: d => d.name, width: 1152, height: 450}));
+display(ExcelButton(inc_diff, `revenues_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```

@@ -12,6 +12,7 @@ import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
 import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
+import {ExcelButton} from "./components/excel-export.js";
 
 const fkv_raw = await FileAttachment("data/classificators/FKV.json").json();
 
@@ -159,6 +160,7 @@ display(WaterfallComparisonChart(exp_wfd, `Expense (functional) change: ${select
 ```js
 const exp_trtab = get_treetab(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectCity, selectYear, month_max);
 display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
+display(ExcelButton(exp_trtab, `expenses_functional_${selectCity}_${selectYear}.xlsx`, "Expenses (Functional)"))
 ```
 
 ---
@@ -168,4 +170,5 @@ display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
 ```js
 const exp_diff = get_treetab_diff(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
+display(ExcelButton(exp_diff, `expenses_functional_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```

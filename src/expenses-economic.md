@@ -12,6 +12,7 @@ import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
 import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
+import {ExcelButton} from "./components/excel-export.js";
 
 const kek_raw = await FileAttachment("data/classificators/KEKV.json").json();
 
@@ -189,6 +190,7 @@ display(WaterfallComparisonChart(exp_wfd, `Expense change: ${selectCity} ${selec
 ```js
 const exp_trtab = get_treetab(expenses_econ, kek_modified, "COD_CONS_EK", selectCity, selectYear, month_max);
 display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
+display(ExcelButton(exp_trtab, `expenses_economic_${selectCity}_${selectYear}.xlsx`, "Expenses (Economic)"))
 ```
 
 ---
@@ -198,4 +200,5 @@ display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
 ```js
 const exp_diff = get_treetab_diff(expenses_econ, kek_modified, "COD_CONS_EK", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
+display(ExcelButton(exp_diff, `expenses_economic_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```
