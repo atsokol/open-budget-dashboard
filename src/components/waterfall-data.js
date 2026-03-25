@@ -107,20 +107,35 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
       YEAR: d.REP_PERIOD ? new Date(d.REP_PERIOD).getUTCFullYear() : null,
       MONTH: d.REP_PERIOD ? new Date(d.REP_PERIOD).getUTCMonth() : null
     }))
-    .filter(d => codeMap.map(D => D.code).includes(d.code));
-  
-  const data_agg = aq.from(data_select)
-    .params({selectYear: selectYear, baseYear: baseYear, selectCity: selectCity, month_max: month_max, adjust: adjust})
-    .join_left(aq.from(codeMap), "code")
-    .derive({
-      code: d => d.groupCode,
-      value: d => d.FAKT_AMT / 1000000 / (adjust ? 2 : 1)
-    })
-    .select("CITY", "YEAR", "MONTH", "code", "value")
+    .filter(d => codeMap.map(D => D.code).includes(d.code))
     .filter(d => d.YEAR == selectYear || d.YEAR == baseYear)
-    .groupby("code", "YEAR", "CITY")
-    .filter(d => d.MONTH == month_max)
-    .rollup({value: aq.op.sum("value")})
+    .filter(d => d.MONTH == month_max);
+  
+  // Map each row to its groupCode and aggregate
+  const codeMapObj = Object.fromEntries(codeMap.map(d => [d.code, d.groupCode]));
+  const aggMap = new Map();
+  for (const d of data_select) {
+    const gc = codeMapObj[d.code];
+    if (!gc) continue;
+    const key = `${gc}|${d.YEAR}`;
+    aggMap.set(key, (aggMap.get(key) || 0) + d.FAKT_AMT / 1000000 / (adjust ? 2 : 1));
+  }
+
+  // Build scaffold: union of all group codes × both years, fill missing with 0
+  // Exclude categories where both years are 0
+  const allGroupCodes = [...new Set([...codeMap.map(d => d.groupCode).filter(Boolean)])];
+  const aggRows = [];
+  for (const gc of allGroupCodes) {
+    const valBase = aggMap.get(`${gc}|${baseYear}`) || 0;
+    const valCurrent = aggMap.get(`${gc}|${selectYear}`) || 0;
+    if (valBase === 0 && valCurrent === 0) continue;
+    for (const yr of [baseYear, selectYear]) {
+      const key = `${gc}|${yr}`;
+      aggRows.push({ code: gc, YEAR: yr, CITY: selectCity, value: aggMap.get(key) || 0 });
+    }
+  }
+
+  const data_agg = aq.from(aggRows)
     .orderby("code")
     .join_left(aq.from(c_table), "code");
   
@@ -129,13 +144,17 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
     .rollup({Total: aq.op.sum("value")})
     .derive({Total_lag: aq.op.lag("Total")});
   
+  // Build code-to-name lookup
+  const codeToName = Object.fromEntries(c_table.map(d => [d.code, d.name]));
+
   const arr = data_agg
     .groupby("code")
     .derive({value_diff: d => d.value - aq.op.lag(d.value)})
     .groupby("YEAR")
-    .pivot("name", "value_diff", {sort: false})
+    .pivot("code", "value_diff", {sort: false})
     .join_left(sumByCol, "YEAR")
-    .filter(d => d.YEAR == selectYear)
+    .params({_selectYear: selectYear})
+    .filter((d, $) => d.YEAR == $._selectYear)
     .relocate("Total_lag", {before: 1})
     .fold([aq.not("YEAR")])
     .derive({
@@ -153,10 +172,10 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
         ? `${selectCat.name}\n${month_max + 1}m ${selectYear}` 
         : (d.key === "Total_lag" 
           ? `${selectCat.name}\n${month_max + 1}m ${baseYear}` 
-          : d.key)
+          : (codeToName[d.key] || d.key))
     }));
   
-  // Update nextKey references to point to renamed keys
+  // Update nextKey references: map codes to names and rename Total/Total_lag
   const baseYearName = `${selectCat.name}\n${month_max + 1}m ${baseYear}`;
   const currentYearName = `${selectCat.name}\n${month_max + 1}m ${selectYear}`;
   arr.forEach((d, i) => {
@@ -164,6 +183,8 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
       arr[i].nextKey = baseYearName;
     } else if (d.nextKey === "Total") {
       arr[i].nextKey = currentYearName;
+    } else if (d.nextKey && codeToName[d.nextKey]) {
+      arr[i].nextKey = codeToName[d.nextKey];
     }
   });
   

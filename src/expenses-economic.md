@@ -11,7 +11,7 @@ import * as aq from "npm:arquero";
 import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
 import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
-import {Icicle, get_treetab} from "./components/icicle.js";
+import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
 
 const kek_raw = await FileAttachment("data/classificators/KEKV.json").json();
 
@@ -141,8 +141,13 @@ TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH milli
 ---
 
 ```js
+const expWfLevels = [...new Set(kek_modified.map(d => d.level))].sort();
+const selectExpWfLevel = view(Inputs.select(expWfLevels, {label: "Drilldown level", value: 0}));
+```
+
+```js
 const selectExpWf = view(Inputs.select(
-  kek_modified.filter(d => d.level <= 1),
+  kek_modified.filter(d => d.level === selectExpWfLevel),
   {label: "Expense category", format: d => d.name}
 ));
 ```
@@ -152,14 +157,19 @@ const exp_wf = prepareWaterfallData(
   expenses_econ, kek_modified, "COD_CONS_EK", selectExpWf,
   selectCity, selectYear, month_max
 );
-display(WaterfallChart(exp_wf, `Expense breakdown: ${selectCity} ${month_max + 1}m ${selectYear}`, d3.format(",d"), "UAH million"))
+display(WaterfallChart(exp_wf, `Expense breakdown: ${selectCity} ${month_max === 11 ? "" : (month_max + 1) + "m "}${selectYear}`, d3.format(",d"), "UAH million"))
 ```
 
 ---
 
 ```js
+const expCompLevels = [...new Set(kek_modified.map(d => d.level))].sort();
+const selectExpCompLevel = view(Inputs.select(expCompLevels, {label: "Drilldown level", value: 0}));
+```
+
+```js
 const selectExpComp = view(Inputs.select(
-  kek_modified.filter(d => d.level <= 1),
+  kek_modified.filter(d => d.level === selectExpCompLevel),
   {label: "Expense category", format: d => d.name}
 ));
 ```
@@ -179,4 +189,13 @@ display(WaterfallComparisonChart(exp_wfd, `Expense change: ${selectCity} ${selec
 ```js
 const exp_trtab = get_treetab(expenses_econ, kek_modified, "COD_CONS_EK", selectCity, selectYear, month_max);
 display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
+```
+
+---
+
+## Expense (economic) change — ${selectCity} ${selectYear} vs ${baseYear}
+
+```js
+const exp_diff = get_treetab_diff(expenses_econ, kek_modified, "COD_CONS_EK", selectCity, selectYear, baseYear, month_max);
+display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
 ```
