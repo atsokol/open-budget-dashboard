@@ -86,9 +86,14 @@ function categorize(code, cats) {
   return null;
 }
 
-// Capital codes: defaults derived from config categories; overridden by user selections in localStorage
-const defaultCapIncCodes = inck_prep.filter(d => d.level > 0 && categorize(d.code, updateIncCat) === "Capital revenues").map(d => d.code);
-const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, updateExpCat) === "Capex").map(d => d.code);
+// Capital codes: defaults derived from config range rules applied to both KDB classificator codes
+// and actual transaction codes — ensures codes like Target funds (absent from KDB due to dateto)
+// are still classified as capital if they fall in a Capital revenues range.
+const defaultCapIncCodes = [...new Set([
+  ...inck_prep.filter(d => d.level > 0).map(d => d.code),
+  ...incomes.map(d => d.COD_INCO)
+].filter(code => categorize(code, updateIncCat) === "Capital revenues"))];
+const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, updateExpCat) === "Capital expenditures").map(d => d.code);
 const capIncSet = new Set((() => {
   try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }
   catch { return defaultCapIncCodes; }
@@ -309,7 +314,7 @@ function aggCredits(creditsData, city, cols) {
 const incUpdate = aggByCut(incomes, "COD_INCO", updateIncCat, selectCity, columns, adjCatCodes, "Capital revenues");
 incUpdate.forEach(r => r.CAT = "Income");
 
-const expUpdateRaw = aggByCut(expenses_econ, "COD_CONS_EK", updateExpCat, selectCity, columns, capExpSet, "Capex");
+const expUpdateRaw = aggByCut(expenses_econ, "COD_CONS_EK", updateExpCat, selectCity, columns, capExpSet, "Capital expenditures");
 const expUpdate = expUpdateRaw.map(r => ({
   ...r, CAT: "Expense",
   actuals: Object.fromEntries(Object.entries(r.actuals).map(([k, v]) => [k, -v])),
@@ -460,17 +465,16 @@ const capitalGrantsSheet = buildDetailSheet(incomes, selectCity, columns, modelI
 ```js
 const fmt0 = d3.format(",.0f");
 const displayData = financialSummary;
-const totalTypes = new Set(["Current revenues", "Operating surplus", "Current surplus",
-  "Capital surplus", "Net surplus before financing", "Net debt", "Net surplus"]);
+const totalTypes = new Set(cfg.summaryTotals.map(t => t.name));
 const nCols = 2 + columns.length + (hasBudget ? 1 : 0);
-const colStyle = "text-align:right; padding: 0 8px; min-width:80px";
+const colStyle = "text-align:right; padding: 0 8px; min-width:80px; vertical-align:middle";
 const headerStyle = "background:var(--theme-foreground-faintest); font-weight:600; padding: 4px 8px";
 
 display(html`<table style="width:100%; border-collapse:collapse; font-size:14px; font-variant-numeric:tabular-nums">
   <thead>
     <tr style="border-bottom:2px solid var(--theme-foreground-faint)">
       <th style="text-align:left; padding:4px 8px">Category</th>
-      <th style="text-align:left; padding:4px 8px">Type</th>
+      <th style="text-align:left; padding:4px 8px; min-width:200px">Type</th>
       ${columns.map(c => html`<th style="${colStyle}">${c.label}</th>`)}
       ${hasBudget ? html`<th style="${colStyle}">Budget ${yearTo}</th>` : ""}
     </tr>
@@ -478,12 +482,13 @@ display(html`<table style="width:100%; border-collapse:collapse; font-size:14px;
   <tbody>
     ${displayData.map(r => {
       const isTotal = r.CAT === "Total" || totalTypes.has(r.TYPE);
+      const isHighlighted = r.TYPE === "Current surplus" || r.TYPE === "Net surplus";
       const rowStyle = isTotal
-        ? "font-weight:700; border-top:1px solid var(--theme-foreground-faint)"
+        ? `font-weight:700; border-top:1px solid var(--theme-foreground-faint)${isHighlighted ? "; background:#fffde7" : ""}`
         : "";
       return html`<tr style="border-bottom:1px solid var(--theme-foreground-faintest); ${rowStyle}">
-        <td style="padding:4px 8px">${r.CAT}</td>
-        <td style="padding:4px 8px">${r.TYPE}</td>
+        <td style="padding:4px 8px; vertical-align:middle">${r.CAT}</td>
+        <td style="padding:4px 8px; vertical-align:middle">${r.TYPE}</td>
         ${columns.map(c => html`<td style="${colStyle}">${fmt0(r.actuals[c.key])}</td>`)}
         ${hasBudget ? html`<td style="${colStyle}">${fmt0(r.budget || 0)}</td>` : ""}
       </tr>`;

@@ -1,79 +1,51 @@
 # OpenBudget Dashboard Configuration
 # Budget category definitions and visualization settings
 
-# ── Financial Summary categories (R: "Open Budget category for update.xlsx") ──
-# Ordered break-end ranges — equivalent to R cut()
-summary_income_categories:
-  - {name: "Tax",              breakEnd: 19999999}
-  - {name: "Non-tax",          breakEnd: 21010499}
-  - {name: "Capital revenues", breakEnd: 21010599}
-  - {name: "Non-tax",          breakEnd: 21010699}
-  - {name: "Capital revenues", breakEnd: 21011199}
-  - {name: "Non-tax",          breakEnd: 21049999}
-  - {name: "Capital revenues", breakEnd: 21050001}
-  - {name: "Non-tax",          breakEnd: 24109999}
-  - {name: "Capital revenues", breakEnd: 24119999}
-  - {name: "Non-tax",          breakEnd: 29999999}
-  - {name: "Capital revenues", breakEnd: 39999999}
-  - {name: "Transfers",        breakEnd: 41999999}
-  - {name: "Capital revenues", breakEnd: 42999999}
-  - {name: "Transfers",        breakEnd: 49999999}
-
-summary_expense_categories:
-  - {name: "Opex",     breakEnd: 2199}
-  - {name: "Opex",     breakEnd: 2249}
-  - {name: "Opex",     breakEnd: 2269}
-  - {name: "Opex",     breakEnd: 2279}
-  - {name: "Capex",    breakEnd: 2281}
-  - {name: "Opex",     breakEnd: 2399}
-  - {name: "Interest", breakEnd: 2599}
-  - {name: "Opex",     breakEnd: 2619}
-  - {name: "Opex",     breakEnd: 2699}
-  - {name: "Opex",     breakEnd: 2799}
-  - {name: "Opex",     breakEnd: 2999}
-  - {name: "Capex",    breakEnd: 3199}
-  - {name: "Capex",    breakEnd: 3219}
-  - {name: "Capex",    breakEnd: 8999}
-  - {name: "Opex",     breakEnd: 9999}
-
-# ── Financial Model categories (R: "Open Budget category for model.xlsx") ──
+# ── Financial Model categories ──
+# Single hierarchical source of truth. Each entry carries:
+#   name     — model-level (detailed) category name
+#   breakEnd — upper code boundary for the ordered range scan (equivalent to R cut())
+#   parent   — summary-level category (derived summary lists are computed from these)
+# NOTE: Non-tax and Capital revenues are interleaved in code space — the global ordering
+#       of breakEnd values must be preserved; hierarchy is expressed via parent, not nesting.
 model_income_categories:
-  - {name: "Personal income tax",               breakEnd: 11019999}
-  - {name: "Other Tax Revenues",                breakEnd: 13999999}
-  - {name: "Internal goods and services taxes", breakEnd: 14999999}
-  - {name: "Other Tax Revenues",                breakEnd: 18049999}
-  - {name: "Unified income tax",                breakEnd: 18059999}
-  - {name: "Other Tax Revenues",                breakEnd: 19999999}
-  - {name: "Other Non-Tax Revenues",            breakEnd: 21010499}
-  - {name: "Interest received",                 breakEnd: 21010599}
-  - {name: "Other Non-Tax Revenues",            breakEnd: 21010699}
-  - {name: "Interest received",                 breakEnd: 21011199}
-  - {name: "Other Non-Tax Revenues",            breakEnd: 21049999}
-  - {name: "Interest received",                 breakEnd: 21050001}
-  - {name: "Other Non-Tax Revenues",            breakEnd: 24109999}
-  - {name: "Interest received",                 breakEnd: 24119999}
-  - {name: "Other Non-Tax Revenues",            breakEnd: 29999999}
-  - {name: "Sale of assets",                    breakEnd: 39999999}
-  - {name: "Transfers",                         breakEnd: 41999999}
-  - {name: "Capital grants",                    breakEnd: 42999999}
-  - {name: "Transfers",                         breakEnd: 49999999}
+  - {name: "Personal income tax",               breakEnd: 11019999, parent: "Tax revenues"}
+  - {name: "Other tax revenues",                breakEnd: 13999999, parent: "Tax revenues"}
+  - {name: "Internal goods and services taxes", breakEnd: 14999999, parent: "Tax revenues"}
+  - {name: "Other tax revenues",                breakEnd: 18049999, parent: "Tax revenues"}
+  - {name: "Unified income tax",                breakEnd: 18059999, parent: "Tax revenues"}
+  - {name: "Other tax revenues",                breakEnd: 19999999, parent: "Tax revenues"}
+  - {name: "Other non-tax revenues",            breakEnd: 21010499, parent: "Non-tax revenues"}
+  - {name: "Interest received",                 breakEnd: 21010599, parent: "Capital revenues"}  # capital interest
+  - {name: "Other non-tax revenues",            breakEnd: 21010699, parent: "Non-tax revenues"}
+  - {name: "Interest received",                 breakEnd: 21011199, parent: "Capital revenues"}  # capital interest
+  - {name: "Other non-tax revenues",            breakEnd: 21049999, parent: "Non-tax revenues"}
+  - {name: "Interest received",                 breakEnd: 21050001, parent: "Capital revenues"}  # capital interest
+  - {name: "Other non-tax revenues",            breakEnd: 24109999, parent: "Non-tax revenues"}
+  - {name: "Interest received",                 breakEnd: 24119999, parent: "Capital revenues"}  # capital interest
+  - {name: "Other non-tax revenues",            breakEnd: 29999999, parent: "Non-tax revenues"}
+  - {name: "Sale of assets",                    breakEnd: 39999999, parent: "Capital revenues"}
+  - {name: "Transfers",                         breakEnd: 41999999, parent: "Transfers"}
+  - {name: "Capital grants",                    breakEnd: 42999999, parent: "Capital revenues"}
+  - {name: "Transfers",                         breakEnd: 49999999, parent: "Transfers"}
+  - {name: "Target funds",                      breakEnd: 59999999, parent: "Capital revenues"}  # Цільові фонди (codes 50000000+)
 
 model_expense_categories:
-  - {name: "Staff Cost",                        breakEnd: 2199}
-  - {name: "Purchase of materials",             breakEnd: 2249}
-  - {name: "Current Discretionary Expenditure", breakEnd: 2269}
-  - {name: "Utility payments",                  breakEnd: 2279}
-  - {name: "Capex",                             breakEnd: 2281}
-  - {name: "Current Discretionary Expenditure", breakEnd: 2399}
-  - {name: "Interest paid",                     breakEnd: 2599}
-  - {name: "Transfer to legal entities",        breakEnd: 2619}
-  - {name: "Transfers to other budgets",        breakEnd: 2699}
-  - {name: "Transfer to residents",             breakEnd: 2799}
-  - {name: "Current Discretionary Expenditure", breakEnd: 2999}
-  - {name: "Capex",                             breakEnd: 3199}
-  - {name: "Capital Transfers (equity)",        breakEnd: 3219}
-  - {name: "Capital Transfers (budget)",        breakEnd: 8999}
-  - {name: "Current Discretionary Expenditure", breakEnd: 9999}
+  - {name: "Staff Costs",                        breakEnd: 2199,  parent: "Operating expenditures"}
+  - {name: "Purchase of materials",             breakEnd: 2249,  parent: "Operating expenditures"}
+  - {name: "Current discretionary expenditure", breakEnd: 2269,  parent: "Operating expenditures"}
+  - {name: "Utility payments",                  breakEnd: 2279,  parent: "Operating expenditures"}
+  - {name: "Capital expenditures",              breakEnd: 2281,  parent: "Capital expenditures"}
+  - {name: "Current discretionary expenditure", breakEnd: 2399,  parent: "Operating expenditures"}
+  - {name: "Interest paid",                     breakEnd: 2599,  parent: "Interest"}
+  - {name: "Transfer to legal entities",        breakEnd: 2619,  parent: "Operating expenditures"}
+  - {name: "Transfers to other budgets",        breakEnd: 2699,  parent: "Operating expenditures"}
+  - {name: "Transfer to residents",             breakEnd: 2799,  parent: "Operating expenditures"}
+  - {name: "Current discretionary expenditure", breakEnd: 2999,  parent: "Operating expenditures"}
+  - {name: "Capital expenditures",              breakEnd: 3199,  parent: "Capital expenditures"}
+  - {name: "Capital transfers (equity)",        breakEnd: 3219,  parent: "Capital expenditures"}
+  - {name: "Capital transfers (budget)",        breakEnd: 8999,  parent: "Capital expenditures"}
+  - {name: "Current discretionary expenditure", breakEnd: 9999,  parent: "Operating expenditures"}
 
 # ── Financing / cash code mappings (from debts dataset) ──
 financing_codes:
@@ -87,25 +59,25 @@ cash_codes:
 
 # ── Financial Summary row order and derived totals ──
 summary_totals:
-  - {name: "Current revenues",            components: ["Tax", "Non-tax", "Transfers"]}
-  - {name: "Operating surplus",           components: ["Current revenues", "Opex"]}
+  - {name: "Current revenues",            components: ["Tax revenues", "Non-tax revenues", "Transfers"]}
+  - {name: "Operating surplus",           components: ["Current revenues", "Operating expenditures"]}
   - {name: "Current surplus",             components: ["Operating surplus", "Interest"]}
-  - {name: "Capital surplus",             components: ["Capital revenues", "Capex"]}
+  - {name: "Capital surplus",             components: ["Capital revenues", "Capital expenditures"]}
   - {name: "Net surplus before financing", components: ["Capital surplus", "Current surplus"]}
   - {name: "Net debt",                    components: ["New Borrowing", "Debt Repayments"]}
   - {name: "Net surplus",                 components: ["Net surplus before financing", "Net debt", "Budget loans balance"]}
 
 summary_row_order:
-  - "Tax"
-  - "Non-tax"
+  - "Tax revenues"
+  - "Non-tax revenues"
   - "Transfers"
   - "Current revenues"
-  - "Opex"
+  - "Operating expenditures"
   - "Operating surplus"
   - "Interest"
   - "Current surplus"
   - "Capital revenues"
-  - "Capex"
+  - "Capital expenditures"
   - "Capital surplus"
   - "Net surplus before financing"
   - "New Borrowing"

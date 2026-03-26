@@ -37,7 +37,7 @@ function addGroupedSheetToWb(wb, headers, dataRows, maxLevel, sheetName) {
     row.outlineLevel = level - 1;
     row.font = fontForLevel(level);
     for (let c = maxLevel + 2; c <= headers.length; c++) {
-      row.getCell(c).numFmt = '#,##0.######';
+      row.getCell(c).numFmt = '#,##0';
     }
   }
   return ws;
@@ -151,7 +151,11 @@ export function addFlatSheet(wb, rows, sheetName, headers = null) {
   const keys = headers || Object.keys(rows[0]);
   ws.columns = keys.map(k => ({header: k, key: k, width: Math.max(String(k).length + 2, 16)}));
   ws.getRow(1).font = {bold: true, size: 11};
-  for (const row of rows) ws.addRow(keys.map(k => row[k]));
+  for (const row of rows) {
+    const cells = keys.map(k => row[k]);
+    const exRow = ws.addRow(cells);
+    cells.forEach((v, i) => { if (typeof v === "number" && !/code/i.test(keys[i])) exRow.getCell(i + 1).numFmt = "#,##0"; });
+  }
 }
 
 // Add a waterfall data sheet to an existing workbook.
@@ -175,7 +179,7 @@ export function addWaterfallSheet(wb, wfData, sheetName) {
     row.font = isTotal
       ? {bold: true,  size: 12}
       : {italic: true, size: 10};
-    row.getCell(2).numFmt = '#,##0.######';
+    row.getCell(2).numFmt = '#,##0';
   }
 }
 
@@ -220,7 +224,7 @@ export function addCurrentSurplusSheet(wb, rows, sheetName, {colLabel = "Amount 
     const row = ws.addRow(cells);
     row.outlineLevel = level - 1;
     row.font = fontForLevel(level);
-    row.getCell(5).numFmt = "#,##0.######";
+    row.getCell(5).numFmt = "#,##0";
   }
 }
 
@@ -257,7 +261,7 @@ export function addCurrentSurplusDiffSheet(wb, rows, sheetName, {currentYear, ba
     const row = ws.addRow(cells);
     row.outlineLevel = level - 1;
     row.font = fontForLevel(level);
-    for (let c = 5; c <= 7; c++) row.getCell(c).numFmt = "#,##0.######";
+    for (let c = 5; c <= 7; c++) row.getCell(c).numFmt = "#,##0";
   }
   if (rows.length > 0) {
     ws.addConditionalFormatting({

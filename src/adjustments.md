@@ -54,11 +54,14 @@ const presentExpCodes = new Set(
 
 // Default selections derived from config categories
 function categorize(code, cats) { for (const c of cats) if (code <= c.breakEnd) return c.name; return null; }
-const defaultCapIncCodes = inck_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryIncomeCategories) === "Capital revenues").map(d => d.code);
-const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryExpenseCategories) === "Capex").map(d => d.code);
+const defaultCapIncCodes = [...new Set([
+  ...inck_prep.filter(d => d.level > 0).map(d => d.code),
+  ...[...presentIncCodes]
+].filter(code => categorize(code, cfg.summaryIncomeCategories) === "Capital revenues"))];
+const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryExpenseCategories) === "Capital expenditures").map(d => d.code);
 
 // Version key to invalidate cached localStorage when defaults change
-const CAPITAL_SETTINGS_VERSION = "v3";
+const CAPITAL_SETTINGS_VERSION = "v4";
 const versionKey = localStorage.getItem('capitalSettingsVersion');
 if (versionKey !== CAPITAL_SETTINGS_VERSION) {
   localStorage.removeItem('capitalIncomeCodes');
