@@ -8,45 +8,20 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Read config.yaml from project root
 const configPath = path.join(__dirname, "../../config.yaml");
 const configYaml = fs.readFileSync(configPath, "utf8");
 const config = yaml.load(configYaml);
 
-// Create flattened structures for easy dashboard consumption
 const result = {
-  // City lookup: name -> codes array
-  cities: config.cities.map(city => ({
-    name: city.name,
-    codes: city.codes
-  })),
-  
-  // City codes -> name lookup (flattened)
-  cityLookup: Object.fromEntries(
-    config.cities.flatMap(city => 
-      city.codes.map(code => [code, city.name])
-    )
-  ),
-  
-  // Revenue categories with colors
-  revenueCategories: config.revenue_categories.map(cat => ({
-    name: cat.name,
-    color: cat.color,
-    type: cat.type,
-    codes: cat.codes
-  })),
-  
-  // Expense categories with colors
-  expenseCategories: config.expense_economic_categories.map(cat => ({
-    name: cat.name,
-    color: cat.color,
-    type: cat.type,
-    codes: cat.codes
-  })),
-  
-  // Color schemes
-  colors: config.colors
+  summaryIncomeCategories:    config.summary_income_categories,
+  summaryExpenseCategories:   config.summary_expense_categories,
+  modelIncomeCategories:      config.model_income_categories,
+  modelExpenseCategories:     config.model_expense_categories,
+  financingCodes:             config.financing_codes,
+  cashCodes:                  config.cash_codes,
+  summaryTotals:              config.summary_totals,
+  summaryRowOrder:            config.summary_row_order,
+  colors:                     config.colors
 };
 
-// Output JSON
 process.stdout.write(JSON.stringify(result));

@@ -42,28 +42,18 @@ function prepClassificator(raw, rootName) {
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
 
-// Capital codes from localStorage (set on Adjustments page)
-const defaultCapIncCodes = [30000000, 42000000, 21050000, 24110000, 21010500, 21010700, 21010800, 21010900];
-const defaultCapExpCodes = [2281, 3000];
-
-function getDescendants(code, flatData) {
-  const codes = [code];
-  flatData.filter(d => d.parentCode === code).forEach(c => codes.push(...getDescendants(c.code, flatData)));
-  return codes;
-}
-function expandCodes(parentCodes, flatData) {
-  const s = new Set();
-  parentCodes.forEach(pc => { if (flatData.find(d => d.code === pc)) getDescendants(pc, flatData).forEach(c => s.add(c)); });
-  return [...s];
-}
+const cfg = await FileAttachment("data/config.json").json();
+function categorize(code, cats) { for (const c of cats) if (code <= c.breakEnd) return c.name; return null; }
+const defaultCapIncCodes = inck_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryIncomeCategories) === "Capital revenues").map(d => d.code);
+const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryExpenseCategories) === "Capex").map(d => d.code);
 
 const capIncSet = new Set((() => {
-  try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : expandCodes(defaultCapIncCodes, inck_prep); }
-  catch { return expandCodes(defaultCapIncCodes, inck_prep); }
+  try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }
+  catch { return defaultCapIncCodes; }
 })());
 const capExpSet = new Set((() => {
-  try { const s = localStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : expandCodes(defaultCapExpCodes, kek_prep); }
-  catch { return expandCodes(defaultCapExpCodes, kek_prep); }
+  try { const s = localStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : defaultCapExpCodes; }
+  catch { return defaultCapExpCodes; }
 })());
 
 // Aggregate per city/period from raw parquet using dynamic capital codes

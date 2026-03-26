@@ -7,12 +7,8 @@ toc: false
 
 ```js
 import * as d3 from "npm:d3";
-import * as aq from "npm:arquero";
 import {TrendsChart} from "./components/trends-chart.js";
-import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
-import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
-import {ExcelButton} from "./components/excel-export.js";
 
 const kek_raw = await FileAttachment("data/classificators/KEKV.json").json();
 
@@ -36,37 +32,6 @@ function prepClassificator(raw, rootName) {
 }
 const kek_prep = prepClassificator(kek_raw, "Загальні видатки");
 
-// Capital expense codes from localStorage (set on Adjustments page)
-const defaultCapExpCodes = [2281, 3000];
-
-function getDescendants(code, flatData) {
-  const codes = [code];
-  flatData.filter(d => d.parentCode === code).forEach(c => codes.push(...getDescendants(c.code, flatData)));
-  return codes;
-}
-function expandCodes(parentCodes, flatData) {
-  const s = new Set();
-  parentCodes.forEach(pc => { if (flatData.find(d => d.code === pc)) getDescendants(pc, flatData).forEach(c => s.add(c)); });
-  return [...s];
-}
-
-const capExpSet = new Set((() => {
-  try { const s = localStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : expandCodes(defaultCapExpCodes, kek_prep); }
-  catch { return expandCodes(defaultCapExpCodes, kek_prep); }
-})());
-
-// Build modified classificator with "Capital expenses" as a separate top-level node
-const synCapExpCode = 99000;
-const kek_modified = [
-  ...kek_prep.map(d => {
-    if (d.code !== 0 && capExpSet.has(d.code) && !capExpSet.has(d.parentCode))
-      return {...d, parentCode: synCapExpCode};
-    return d;
-  }),
-  {code: synCapExpCode, parentCode: 0, name: "Капітальні видатки", level: 1}
-];
-
-// Aggregate total expense per city/period from raw parquet
 const data = (() => {
   const agg = {};
   for (const d of expenses_econ) {
@@ -141,56 +106,11 @@ TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH milli
 
 ---
 
-```js
-const expWfLevels = [...new Set(kek_modified.map(d => d.level))].sort();
-const selectExpWfLevel = view(Inputs.select(expWfLevels, {label: "Drilldown level", value: 0}));
-```
-
-```js
-const selectExpWf = view(Inputs.select(
-  kek_modified.filter(d => d.level === selectExpWfLevel),
-  {label: "Expense category", format: d => d.name}
-));
-```
-
-```js
-const exp_wf = prepareWaterfallData(
-  expenses_econ, kek_modified, "COD_CONS_EK", selectExpWf,
-  selectCity, selectYear, month_max
-);
-display(WaterfallChart(exp_wf, `Expense breakdown: ${selectCity} ${month_max === 11 ? "" : (month_max + 1) + "m "}${selectYear}`, d3.format(",d"), "UAH million"))
-```
-
----
-
-```js
-const expCompLevels = [...new Set(kek_modified.map(d => d.level))].sort();
-const selectExpCompLevel = view(Inputs.select(expCompLevels, {label: "Drilldown level", value: 0}));
-```
-
-```js
-const selectExpComp = view(Inputs.select(
-  kek_modified.filter(d => d.level === selectExpCompLevel),
-  {label: "Expense category", format: d => d.name}
-));
-```
-
-```js
-const exp_wfd = prepareWaterfallComparisonData(
-  expenses_econ, kek_modified, "COD_CONS_EK", selectExpComp,
-  selectCity, selectYear, baseYear, month_max
-);
-display(WaterfallComparisonChart(exp_wfd, `Expense change: ${selectCity} ${selectYear} vs ${baseYear}`, d3.format(",d"), "UAH million"))
-```
-
----
-
 ## Expense (economic) categories — ${selectCity} ${selectYear}
 
 ```js
 const exp_trtab = get_treetab(expenses_econ, kek_prep, "COD_CONS_EK", selectCity, selectYear, month_max);
 display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
-display(ExcelButton(exp_trtab, `expenses_economic_${selectCity}_${selectYear}.xlsx`, "Expenses (Economic)"))
 ```
 
 ---
@@ -200,5 +120,4 @@ display(ExcelButton(exp_trtab, `expenses_economic_${selectCity}_${selectYear}.xl
 ```js
 const exp_diff = get_treetab_diff(expenses_econ, kek_prep, "COD_CONS_EK", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
-display(ExcelButton(exp_diff, `expenses_economic_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```

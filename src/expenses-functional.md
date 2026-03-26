@@ -7,12 +7,8 @@ toc: false
 
 ```js
 import * as d3 from "npm:d3";
-import * as aq from "npm:arquero";
 import {TrendsChart} from "./components/trends-chart.js";
-import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
-import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
-import {ExcelButton} from "./components/excel-export.js";
 
 const fkv_raw = await FileAttachment("data/classificators/FKV.json").json();
 
@@ -36,7 +32,6 @@ function prepClassificator(raw, rootName) {
 }
 const fkv_prep = prepClassificator(fkv_raw, "Загальні видатки (функціональні)");
 
-// Aggregate total expense per city/period from raw parquet
 const data = (() => {
   const agg = {};
   for (const d of expenses_func) {
@@ -111,56 +106,11 @@ TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH milli
 
 ---
 
-```js
-const expWfLevels = [...new Set(fkv_prep.map(d => d.level))].sort();
-const selectExpWfLevel = view(Inputs.select(expWfLevels, {label: "Drilldown level", value: 0}));
-```
-
-```js
-const selectExpWf = view(Inputs.select(
-  fkv_prep.filter(d => d.level === selectExpWfLevel),
-  {label: "Expense category", format: d => d.name}
-));
-```
-
-```js
-const exp_wf = prepareWaterfallData(
-  expenses_func, fkv_prep, "COD_CONS_MB_FK", selectExpWf,
-  selectCity, selectYear, month_max
-);
-display(WaterfallChart(exp_wf, `Expense (functional) breakdown: ${selectCity} ${month_max === 11 ? "" : (month_max + 1) + "m "}${selectYear}`, d3.format(",d"), "UAH million"))
-```
-
----
-
-```js
-const expCompLevels = [...new Set(fkv_prep.map(d => d.level))].sort();
-const selectExpCompLevel = view(Inputs.select(expCompLevels, {label: "Drilldown level", value: 1}));
-```
-
-```js
-const selectExpComp = view(Inputs.select(
-  fkv_prep.filter(d => d.level === selectExpCompLevel),
-  {label: "Expense category", format: d => d.name}
-));
-```
-
-```js
-const exp_wfd = prepareWaterfallComparisonData(
-  expenses_func, fkv_prep, "COD_CONS_MB_FK", selectExpComp,
-  selectCity, selectYear, baseYear, month_max
-);
-display(WaterfallComparisonChart(exp_wfd, `Expense (functional) change: ${selectCity} ${selectYear} vs ${baseYear}`, d3.format(",d"), "UAH million"))
-```
-
----
-
 ## Expense (functional) categories — ${selectCity} ${selectYear}
 
 ```js
 const exp_trtab = get_treetab(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectCity, selectYear, month_max);
 display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
-display(ExcelButton(exp_trtab, `expenses_functional_${selectCity}_${selectYear}.xlsx`, "Expenses (Functional)"))
 ```
 
 ---
@@ -170,5 +120,4 @@ display(ExcelButton(exp_trtab, `expenses_functional_${selectCity}_${selectYear}.
 ```js
 const exp_diff = get_treetab_diff(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
-display(ExcelButton(exp_diff, `expenses_functional_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```

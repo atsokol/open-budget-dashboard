@@ -9,10 +9,9 @@ Current surplus = current (non-capital) revenues − current (non-capital) expen
 
 ```js
 import * as d3 from "npm:d3";
-import * as aq from "npm:arquero";
 import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
-import {prepareWaterfallData, prepareWaterfallComparisonData, get_codes} from "./components/waterfall-data.js";
+import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 
 const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
 const kek_raw  = await FileAttachment("data/classificators/KEKV.json").json();
@@ -43,36 +42,24 @@ function prepClassificator(raw, rootName) {
 }
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
+const cfg = await FileAttachment("data/config.json").json();
 
-// Derive cityNames and availableYears from raw parquet
-const cityNames = [...new Set(incomes.map(d => d.CITY))].sort();
-const availableYears = [...new Set(incomes.map(d => d.REP_PERIOD.getUTCFullYear()))].sort();
-```
-
-```js
-// Capital codes from localStorage (set on Adjustments page)
-const defaultCapIncCodes = [30000000, 42000000, 21050000, 24110000, 21010500, 21010700, 21010800, 21010900];
-const defaultCapExpCodes = [2281, 3000];
-
-function getDescendants(code, flatData) {
-  const codes = [code];
-  flatData.filter(d => d.parentCode === code).forEach(c => codes.push(...getDescendants(c.code, flatData)));
-  return codes;
-}
-function expandCodes(parentCodes, flatData) {
-  const s = new Set();
-  parentCodes.forEach(pc => { if (flatData.find(d => d.code === pc)) getDescendants(pc, flatData).forEach(c => s.add(c)); });
-  return [...s];
-}
-
+function categorize(code, cats) { for (const c of cats) if (code <= c.breakEnd) return c.name; return null; }
+const defaultCapIncCodes = inck_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryIncomeCategories) === "Capital revenues").map(d => d.code);
+const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryExpenseCategories) === "Capex").map(d => d.code);
 const capitalIncomeCodes = (() => {
-  try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : expandCodes(defaultCapIncCodes, inck_prep); }
-  catch { return expandCodes(defaultCapIncCodes, inck_prep); }
+  try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }
+  catch { return defaultCapIncCodes; }
 })();
 const capitalExpenseCodes = (() => {
-  try { const s = localStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : expandCodes(defaultCapExpCodes, kek_prep); }
-  catch { return expandCodes(defaultCapExpCodes, kek_prep); }
+  try { const s = localStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : defaultCapExpCodes; }
+  catch { return defaultCapExpCodes; }
 })();
+const capIncSet = new Set(capitalIncomeCodes);
+const capExpSet = new Set(capitalExpenseCodes);
+
+const cityNames = [...new Set(incomes.map(d => d.CITY))].sort();
+const availableYears = [...new Set(incomes.map(d => d.REP_PERIOD.getUTCFullYear()))].sort();
 ```
 
 ```js
@@ -126,35 +113,7 @@ const month_max = Math.max(...incomes
 ```
 
 ```js
-// Build current surplus data from raw parquet using capital codes from Adjustments page
-const inc_cap_codes = get_codes(inck_prep, capitalIncomeCodes);
-const exp_cap_codes = get_codes(kek_prep, capitalExpenseCodes);
-
-const capIncSetLocal = new Set(capitalIncomeCodes);
-const capExpSetLocal = new Set(capitalExpenseCodes);
-
-const curr_inc = incomes.filter(d => !inc_cap_codes.includes(d.COD_INCO));
-const curr_exp = expenses_econ.filter(d => !exp_cap_codes.includes(d.COD_CONS_EK));
-
-// Combine income and expenses into a single dataset with a unified COD field
-// Expenses are negated so that surplus = sum of all COD entries
-const curr_surplus_data = [
-  ...curr_inc.map(d => ({...d, COD: d.COD_INCO, FAKT_AMT: +d.FAKT_AMT})),
-  ...curr_exp.map(d => ({...d, COD: d.COD_CONS_EK, FAKT_AMT: -d.FAKT_AMT})),
-];
-
-// Build combi hierarchy: income codes (excl. capital) + expense codes (excl. capital, excl. 2000 grouping node)
-// KEKV code 2000 is a grouping node; remap its children directly to root
-const combi_table = [
-  {code: 0, parentCode: null, name: "Current surplus", level: 0},
-  ...inck_prep.slice(1).filter(d => !inc_cap_codes.includes(d.code)),
-  ...kek_prep.slice(1)
-    .filter(d => d.code !== 2000)
-    .filter(d => !exp_cap_codes.includes(d.code))
-    .map(d => ({...d, parentCode: d.parentCode === 2000 ? 0 : d.parentCode}))
-];
-
-// Compute current surplus trends from raw data using localStorage capital codes
+// Compute current surplus trends
 const trendData = (() => {
   const agg = {};
   for (const d of incomes) {
@@ -162,14 +121,14 @@ const trendData = (() => {
     const k = `${d.CITY}|${d.REP_PERIOD.getTime()}`;
     if (!agg[k]) agg[k] = { CITY: d.CITY, REP_PERIOD: d.REP_PERIOD, inc: 0, capInc: 0, exp: 0, capExp: 0 };
     agg[k].inc += d.FAKT_AMT || 0;
-    if (capIncSetLocal.has(d.COD_INCO)) agg[k].capInc += d.FAKT_AMT || 0;
+    if (capIncSet.has(d.COD_INCO)) agg[k].capInc += d.FAKT_AMT || 0;
   }
   for (const d of expenses_econ) {
     if (d.FUND_TYP !== "T") continue;
     const k = `${d.CITY}|${d.REP_PERIOD.getTime()}`;
     if (!agg[k]) agg[k] = { CITY: d.CITY, REP_PERIOD: d.REP_PERIOD, inc: 0, capInc: 0, exp: 0, capExp: 0 };
     agg[k].exp += d.FAKT_AMT || 0;
-    if (capExpSetLocal.has(d.COD_CONS_EK)) agg[k].capExp += d.FAKT_AMT || 0;
+    if (capExpSet.has(d.COD_CONS_EK)) agg[k].capExp += d.FAKT_AMT || 0;
   }
   return Object.values(agg).map(d => ({
     CITY: d.CITY,
@@ -186,9 +145,53 @@ TrendsChart(trendData, selectCity, "Current surplus", "curr_surplus", d3.format(
 ---
 
 ```js
+// Build a flat synthetic classificator from Financial Model categories.
+// Income model categories get synthetic codes 1..N (positive FAKT_AMT).
+// Expense model categories get synthetic codes N+1..N+M (expenses negated so surplus = sum).
+// This lets the existing waterfall components display the breakdown at model-category level
+// rather than at individual budget code level.
+
+const modelIncCat = cfg.modelIncomeCategories;
+const modelExpCat = cfg.modelExpenseCategories;
+
+// Ordered unique category names
+const incCatNames = [...new Map(modelIncCat.map(d => [d.name, true])).keys()];
+const expCatNames = [...new Map(modelExpCat.map(d => [d.name, true])).keys()];
+
+// Assign synthetic integer codes
+const incCatCode = Object.fromEntries(incCatNames.map((n, i) => [n, i + 1]));
+const expCatCode = Object.fromEntries(expCatNames.map((n, i) => [n, incCatNames.length + i + 1]));
+
+// Flat 2-level hierarchy: root = "Current surplus", leaves = model categories
+const synth_table = [
+  {code: 0, parentCode: null, name: "Current surplus", level: 0},
+  ...incCatNames.map(n => ({code: incCatCode[n], parentCode: 0, name: n, level: 1})),
+  ...expCatNames.map(n => ({code: expCatCode[n], parentCode: 0, name: n, level: 1})),
+];
+
+// Pre-aggregate raw data into synthetic category codes.
+// Capital codes (capIncSet / capExpSet) are excluded.
+// Expenses are negated so current surplus = sum of all entries.
+const synth_data = [];
+for (const d of incomes) {
+  if (capIncSet.has(d.COD_INCO)) continue;
+  const cat = categorize(d.COD_INCO, modelIncCat);
+  if (cat == null || incCatCode[cat] == null) continue;
+  synth_data.push({CITY: d.CITY, REP_PERIOD: d.REP_PERIOD, FUND_TYP: d.FUND_TYP, COD: incCatCode[cat], FAKT_AMT: d.FAKT_AMT});
+}
+for (const d of expenses_econ) {
+  if (capExpSet.has(d.COD_CONS_EK)) continue;
+  const cat = categorize(d.COD_CONS_EK, modelExpCat);
+  if (cat == null || expCatCode[cat] == null) continue;
+  synth_data.push({CITY: d.CITY, REP_PERIOD: d.REP_PERIOD, FUND_TYP: d.FUND_TYP, COD: expCatCode[cat], FAKT_AMT: -d.FAKT_AMT});
+}
+```
+
+```js
+const cs_root = {code: 0, name: "Current surplus"};
+
 const curr_surplus_wf = prepareWaterfallData(
-  curr_surplus_data, combi_table, "COD",
-  {code: 0, name: "Current surplus"},
+  synth_data, synth_table, "COD", cs_root,
   selectCity, selectYear, month_max
 );
 display(WaterfallChart(curr_surplus_wf, `Current surplus waterfall: ${selectCity} ${selectYear}`, d3.format(",d"), "UAH million"))
@@ -198,8 +201,7 @@ display(WaterfallChart(curr_surplus_wf, `Current surplus waterfall: ${selectCity
 
 ```js
 const curr_surplus_wfd = prepareWaterfallComparisonData(
-  curr_surplus_data, combi_table, "COD",
-  {code: 0, name: "Current surplus"},
+  synth_data, synth_table, "COD", cs_root,
   selectCity, selectYear, baseYear, month_max
 );
 display(WaterfallComparisonChart(curr_surplus_wfd, `Current surplus change: ${selectCity} ${selectYear} vs ${baseYear}`, d3.format(",d"), "UAH million"))

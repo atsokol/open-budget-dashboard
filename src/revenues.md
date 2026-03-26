@@ -7,12 +7,8 @@ toc: false
 
 ```js
 import * as d3 from "npm:d3";
-import * as aq from "npm:arquero";
 import {TrendsChart} from "./components/trends-chart.js";
-import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
-import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
-import {ExcelButton} from "./components/excel-export.js";
 
 const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
 
@@ -36,37 +32,6 @@ function prepClassificator(raw, rootName) {
 }
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 
-// Capital income codes from localStorage (set on Adjustments page)
-const defaultCapIncCodes = [30000000, 42000000, 21050000, 24110000, 21010500, 21010700, 21010800, 21010900];
-
-function getDescendants(code, flatData) {
-  const codes = [code];
-  flatData.filter(d => d.parentCode === code).forEach(c => codes.push(...getDescendants(c.code, flatData)));
-  return codes;
-}
-function expandCodes(parentCodes, flatData) {
-  const s = new Set();
-  parentCodes.forEach(pc => { if (flatData.find(d => d.code === pc)) getDescendants(pc, flatData).forEach(c => s.add(c)); });
-  return [...s];
-}
-
-const capIncSet = new Set((() => {
-  try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : expandCodes(defaultCapIncCodes, inck_prep); }
-  catch { return expandCodes(defaultCapIncCodes, inck_prep); }
-})());
-
-// Build modified classificator with "Capital revenues" as a separate top-level node
-const synCapIncCode = 99000000;
-const inck_modified = [
-  ...inck_prep.map(d => {
-    if (d.code !== 0 && capIncSet.has(d.code) && !capIncSet.has(d.parentCode))
-      return {...d, parentCode: synCapIncCode};
-    return d;
-  }),
-  {code: synCapIncCode, parentCode: 0, name: "Capital revenues", level: 1}
-];
-
-// Aggregate total income per city/period from raw parquet
 const data = (() => {
   const agg = {};
   for (const d of incomes) {
@@ -139,76 +104,6 @@ const month_max = Math.max(...incomes
 TrendsChart(data, selectCity, "Revenues", "income", d3.format(",d"), "UAH million")
 ```
 
-```js
-// Compute which codes have non-zero values for the selected city/year
-const activeIncCodes = new Set(
-  incomes
-    .filter(d => d.FUND_TYP === "T" && d.CITY === selectCity
-      && d.REP_PERIOD.getUTCFullYear() == selectYear
-      && d.REP_PERIOD.getUTCMonth() == month_max
-      && d.FAKT_AMT !== 0)
-    .map(d => d.COD_INCO)
-);
-
-// Also include ancestor codes so parent categories with active children are shown
-function getAncestorCodes(codes, cTable) {
-  const result = new Set(codes);
-  for (const code of codes) {
-    let item = cTable.find(d => d.code === code);
-    while (item && item.parentCode != null) {
-      result.add(item.parentCode);
-      item = cTable.find(d => d.code === item.parentCode);
-    }
-  }
-  return result;
-}
-const activeIncCodesWithAncestors = getAncestorCodes(activeIncCodes, inck_modified);
-```
-
----
-
-```js
-const incWfLevels = [...new Set(inck_modified.map(d => d.level))].sort();
-const selectIncWfLevel = view(Inputs.select(incWfLevels, {label: "Drilldown level", value: 0}));
-```
-
-```js
-const selectIncWf = view(Inputs.select(
-  inck_modified.filter(d => d.level === selectIncWfLevel && activeIncCodesWithAncestors.has(d.code)),
-  {label: "Revenue category", format: d => d.name}
-));
-```
-
-```js
-const inc_wf = prepareWaterfallData(
-  incomes, inck_modified, "COD_INCO", selectIncWf,
-  selectCity, selectYear, month_max
-);
-display(WaterfallChart(inc_wf, `Revenue breakdown: ${selectCity} ${month_max === 11 ? "" : (month_max + 1) + "m "}${selectYear}`, d3.format(",d"), "UAH million"))
-```
-
----
-
-```js
-const incCompLevels = [...new Set(inck_modified.map(d => d.level))].sort();
-const selectIncCompLevel = view(Inputs.select(incCompLevels, {label: "Drilldown level", value: 0}));
-```
-
-```js
-const selectIncComp = view(Inputs.select(
-  inck_modified.filter(d => d.level === selectIncCompLevel && activeIncCodesWithAncestors.has(d.code)),
-  {label: "Revenue category", format: d => d.name}
-));
-```
-
-```js
-const inc_wfd = prepareWaterfallComparisonData(
-  incomes, inck_modified, "COD_INCO", selectIncComp,
-  selectCity, selectYear, baseYear, month_max
-);
-display(WaterfallComparisonChart(inc_wfd, `Revenue change: ${selectCity} ${month_max === 11 ? "" : (month_max + 1) + "m "}${selectYear} vs ${baseYear}`, d3.format(",d"), "UAH million"))
-```
-
 ---
 
 ## Revenue classification — ${selectCity} ${selectYear}
@@ -216,7 +111,6 @@ display(WaterfallComparisonChart(inc_wfd, `Revenue change: ${selectCity} ${month
 ```js
 const inc_trtab = get_treetab(incomes, inck_prep, "COD_INCO", selectCity, selectYear, month_max);
 display(Icicle(inc_trtab, {label: d => d.name, width: 1152, height: 450}))
-display(ExcelButton(inc_trtab, `revenues_${selectCity}_${selectYear}.xlsx`, "Revenues"))
 ```
 
 ---
@@ -226,5 +120,4 @@ display(ExcelButton(inc_trtab, `revenues_${selectCity}_${selectYear}.xlsx`, "Rev
 ```js
 const inc_diff = get_treetab_diff(incomes, inck_prep, "COD_INCO", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(inc_diff, {label: d => d.name, width: 1152, height: 450}));
-display(ExcelButton(inc_diff, `revenues_diff_${selectCity}_${selectYear}_vs_${baseYear}.xlsx`, "Comparison", {isDiff: true, currentYear: selectYear, baseYear}))
 ```

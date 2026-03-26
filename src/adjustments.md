@@ -19,7 +19,8 @@ Inputs.button("Reset to Defaults", {
 ```
 
 ```js
-// Load classificators
+// Load config and classificators
+const cfg = await FileAttachment("data/config.json").json();
 const inck_table = await FileAttachment("data/classificators/KDB.json").json();
 const kek_table = await FileAttachment("data/classificators/KEKV.json").json();
 
@@ -38,64 +39,33 @@ const kek_prep = Array.from(new Map(
     .map(d => [d.code, d])
 ).values()).sort((a, b) => a.code - b.code);
 
-// Default selections based on nb.html (parent codes - will be expanded to descendants)
-const defaultCapitalIncomeParentCodes = [30000000, 42000000, 21050000, 24110000, 21010500, 21010700, 21010800, 21010900];
-const defaultCapitalExpenseParentCodes = [2281, 3000];
+// Default selections derived from config categories
+function categorize(code, cats) { for (const c of cats) if (code <= c.breakEnd) return c.name; return null; }
+const defaultCapIncCodes = inck_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryIncomeCategories) === "Capital revenues").map(d => d.code);
+const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryExpenseCategories) === "Capex").map(d => d.code);
 
 // Version key to invalidate cached localStorage when defaults change
-const CAPITAL_SETTINGS_VERSION = "v2";
+const CAPITAL_SETTINGS_VERSION = "v3";
 const versionKey = localStorage.getItem('capitalSettingsVersion');
 if (versionKey !== CAPITAL_SETTINGS_VERSION) {
-  // Clear old cached values
   localStorage.removeItem('capitalIncomeCodes');
   localStorage.removeItem('capitalExpenseCodes');
   localStorage.setItem('capitalSettingsVersion', CAPITAL_SETTINGS_VERSION);
 }
 
-// Helper to expand parent codes to all descendant codes
-function expandToDescendants(parentCodes, flatData) {
-  const allCodes = new Set();
-  for (const parentCode of parentCodes) {
-    const node = flatData.find(d => d.code === parentCode);
-    if (node) {
-      const descendants = getDescendantCodesFlat(parentCode, flatData);
-      descendants.forEach(c => allCodes.add(c));
-    }
-  }
-  return [...allCodes];
-}
-
-// Get descendant codes from flat data (simpler version for initialization)
-function getDescendantCodesFlat(code, flatData) {
-  const codes = [code];
-  const children = flatData.filter(d => d.parentCode === code);
-  children.forEach(child => {
-    codes.push(...getDescendantCodesFlat(child.code, flatData));
-  });
-  return codes;
-}
-
-// Load saved selections from localStorage or use defaults (expanded to descendants)
+// Load saved selections from localStorage or use defaults
 const loadSavedIncomeCodes = () => {
   const saved = localStorage.getItem('capitalIncomeCodes');
-  if (saved) {
-    return JSON.parse(saved);
-  }
-  // Expand defaults to all descendants and save to localStorage
-  const expanded = expandToDescendants(defaultCapitalIncomeParentCodes, inck_prep);
-  localStorage.setItem('capitalIncomeCodes', JSON.stringify(expanded));
-  return expanded;
+  if (saved) return JSON.parse(saved);
+  localStorage.setItem('capitalIncomeCodes', JSON.stringify(defaultCapIncCodes));
+  return defaultCapIncCodes;
 };
 
 const loadSavedExpenseCodes = () => {
   const saved = localStorage.getItem('capitalExpenseCodes');
-  if (saved) {
-    return JSON.parse(saved);
-  }
-  // Expand defaults to all descendants and save to localStorage
-  const expanded = expandToDescendants(defaultCapitalExpenseParentCodes, kek_prep);
-  localStorage.setItem('capitalExpenseCodes', JSON.stringify(expanded));
-  return expanded;
+  if (saved) return JSON.parse(saved);
+  localStorage.setItem('capitalExpenseCodes', JSON.stringify(defaultCapExpCodes));
+  return defaultCapExpCodes;
 };
 
 // Build hierarchical structure - check for both null and 0 as root

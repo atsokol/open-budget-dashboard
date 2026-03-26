@@ -1,117 +1,121 @@
 # OpenBudget Dashboard Configuration
-# This file defines all cities, budget categories, and visualization settings
+# Budget category definitions and visualization settings
 
-cities:
-  - name: "Cherkasy"
-    codes: ["2357600000", "23576000000"]
-  - name: "Chernihiv"
-    codes: ["25559000000", "2555900000"]
-  - name: "Chernivtsi"
-    codes: ["2455200000", "24552000000"]
-  - name: "Dnipro"
-    codes: ["0457600000", "04576000000"]
-  - name: "Ivano-Frankivsk"
-    codes: ["0953300000", "09533000000"]
-  - name: "Kharkiv"
-    codes: ["2055400000", "20554000000"]
-  - name: "Khmelnytskyi"
-    codes: ["2256400000", "22564000000"]
-  - name: "Kremenchuk"
-    codes: ["1656400000", "16564000000"]
-  - name: "Kryvyi Rih"
-    codes: ["0457800000", "04578000000", "0457810000"]
-  - name: "Kyiv"
-    codes: ["2600000000", "26000000000"]
-  - name: "Lutsk"
-    codes: ["0355100000", "03551000000"]
-  - name: "Lviv"
-    codes: ["1356300000", "13563000000"]
-  - name: "Mykolaiv"
-    codes: ["1454900000", "14549000000"]
-  - name: "Odesa"
-    codes: ["1556400000", "15564000000"]
-  - name: "Poltava"
-    codes: ["1657000000", "16570000000", "1657010000"]
-  - name: "Rivne"
-    codes: ["17564000000", "1756400000"]
-  - name: "Sumy"
-    codes: ["18531000000", "1853100000"]
-  - name: "Ternopil"
-    codes: ["1954900000", "19549000000"]
-  - name: "Uzhhorod"
-    codes: ["0755900000", "07559000000"]
-  - name: "Vinnytsia"
-    codes: ["0253600000", "02536000000"]
-  - name: "Zhytomyr"
-    codes: ["0655200000", "06552000000"]
-  - name: "Zaporizhzhia"
-    codes: ["0856200000", "08562000000"]
-  - name: "Mukachevo"
-    codes: ["0750700000", "07507000000"]
-  - name: "R_Vinnytsia"
-    codes: ["0210000000"]
+# ── Financial Summary categories (R: "Open Budget category for update.xlsx") ──
+# Ordered break-end ranges — equivalent to R cut()
+summary_income_categories:
+  - {name: "Tax",              breakEnd: 19999999}
+  - {name: "Non-tax",          breakEnd: 21010499}
+  - {name: "Capital revenues", breakEnd: 21010599}
+  - {name: "Non-tax",          breakEnd: 21010699}
+  - {name: "Capital revenues", breakEnd: 21011199}
+  - {name: "Non-tax",          breakEnd: 21049999}
+  - {name: "Capital revenues", breakEnd: 21050001}
+  - {name: "Non-tax",          breakEnd: 24109999}
+  - {name: "Capital revenues", breakEnd: 24119999}
+  - {name: "Non-tax",          breakEnd: 29999999}
+  - {name: "Capital revenues", breakEnd: 39999999}
+  - {name: "Transfers",        breakEnd: 41999999}
+  - {name: "Capital revenues", breakEnd: 42999999}
+  - {name: "Transfers",        breakEnd: 49999999}
 
-# Revenue categories (based on income codes)
-revenue_categories:
-  - name: "Tax revenues"
-    codes: [0, 19999999]
-    color: "#4682b4"
-    type: "range"
-  - name: "Non-tax revenues"
-    codes: 
-      - [20000000, 21010499]
-      - [21010600, 21010699]
-      - [21011200, 21049999]
-      - [21050002, 24109999]
-      - [24120000, 29999999]
-      - [50000000, 59999999]
-    color: "#2e8b57"
-    type: "ranges"
-  - name: "Capital revenues"
-    codes:
-      - [21010500, 21010599]
-      - [21010700, 21011199]
-      - [21050000, 21050001]
-      - [24110000, 24119999]
-      - [30000000, 39999999]
-      - [42000000, 42999999]
-    color: "#ff8c00"
-    type: "ranges"
-  - name: "Transfers"
-    codes:
-      - [40000000, 41999999]
-      - [43000000, 49999999]
-    color: "#9370db"
-    type: "ranges"
+summary_expense_categories:
+  - {name: "Opex",     breakEnd: 2199}
+  - {name: "Opex",     breakEnd: 2249}
+  - {name: "Opex",     breakEnd: 2269}
+  - {name: "Opex",     breakEnd: 2279}
+  - {name: "Capex",    breakEnd: 2281}
+  - {name: "Opex",     breakEnd: 2399}
+  - {name: "Interest", breakEnd: 2599}
+  - {name: "Opex",     breakEnd: 2619}
+  - {name: "Opex",     breakEnd: 2699}
+  - {name: "Opex",     breakEnd: 2799}
+  - {name: "Opex",     breakEnd: 2999}
+  - {name: "Capex",    breakEnd: 3199}
+  - {name: "Capex",    breakEnd: 3219}
+  - {name: "Capex",    breakEnd: 8999}
+  - {name: "Opex",     breakEnd: 9999}
 
-# Expense categories (economic classification)
-expense_economic_categories:
-  - name: "Current expenses"
-    codes:
-      - [0, 2199]
-      - [2200, 2249]
-      - [2250, 2269]
-      - [2270, 2279]
-      - [2282, 2399]
-      - [2600, 2619]
-      - [2620, 2699]
-      - [2700, 2799]
-      - [2800, 2999]
-      - [9000, 9999]
-    color: "#4169e1"
-    type: "ranges"
-  - name: "Capital expenses"
-    codes:
-      - [2280, 2281]
-      - [3000, 3199]
-      - [3200, 3219]
-      - [3220, 8999]
-    color: "#dc143c"
-    type: "ranges"
-  - name: "Interest payments"
-    codes: [2400, 2599]
-    color: "#ff6347"
-    type: "range"
+# ── Financial Model categories (R: "Open Budget category for model.xlsx") ──
+model_income_categories:
+  - {name: "Personal income tax",               breakEnd: 11019999}
+  - {name: "Other Tax Revenues",                breakEnd: 13999999}
+  - {name: "Internal goods and services taxes", breakEnd: 14999999}
+  - {name: "Other Tax Revenues",                breakEnd: 18049999}
+  - {name: "Unified income tax",                breakEnd: 18059999}
+  - {name: "Other Tax Revenues",                breakEnd: 19999999}
+  - {name: "Other Non-Tax Revenues",            breakEnd: 21010499}
+  - {name: "Interest received",                 breakEnd: 21010599}
+  - {name: "Other Non-Tax Revenues",            breakEnd: 21010699}
+  - {name: "Interest received",                 breakEnd: 21011199}
+  - {name: "Other Non-Tax Revenues",            breakEnd: 21049999}
+  - {name: "Interest received",                 breakEnd: 21050001}
+  - {name: "Other Non-Tax Revenues",            breakEnd: 24109999}
+  - {name: "Interest received",                 breakEnd: 24119999}
+  - {name: "Other Non-Tax Revenues",            breakEnd: 29999999}
+  - {name: "Sale of assets",                    breakEnd: 39999999}
+  - {name: "Transfers",                         breakEnd: 41999999}
+  - {name: "Capital grants",                    breakEnd: 42999999}
+  - {name: "Transfers",                         breakEnd: 49999999}
+
+model_expense_categories:
+  - {name: "Staff Cost",                        breakEnd: 2199}
+  - {name: "Purchase of materials",             breakEnd: 2249}
+  - {name: "Current Discretionary Expenditure", breakEnd: 2269}
+  - {name: "Utility payments",                  breakEnd: 2279}
+  - {name: "Capex",                             breakEnd: 2281}
+  - {name: "Current Discretionary Expenditure", breakEnd: 2399}
+  - {name: "Interest paid",                     breakEnd: 2599}
+  - {name: "Transfer to legal entities",        breakEnd: 2619}
+  - {name: "Transfers to other budgets",        breakEnd: 2699}
+  - {name: "Transfer to residents",             breakEnd: 2799}
+  - {name: "Current Discretionary Expenditure", breakEnd: 2999}
+  - {name: "Capex",                             breakEnd: 3199}
+  - {name: "Capital Transfers (equity)",        breakEnd: 3219}
+  - {name: "Capital Transfers (budget)",        breakEnd: 8999}
+  - {name: "Current Discretionary Expenditure", breakEnd: 9999}
+
+# ── Financing / cash code mappings (from debts dataset) ──
+financing_codes:
+  401000: "New Borrowing"
+  402000: "Debt Repayments"
+  602300: "Interbudget loans"
+
+cash_codes:
+  602100: "Cash, bop"
+  602200: "Cash, eop"
+
+# ── Financial Summary row order and derived totals ──
+summary_totals:
+  - {name: "Current revenues",            components: ["Tax", "Non-tax", "Transfers"]}
+  - {name: "Operating surplus",           components: ["Current revenues", "Opex"]}
+  - {name: "Current surplus",             components: ["Operating surplus", "Interest"]}
+  - {name: "Capital surplus",             components: ["Capital revenues", "Capex"]}
+  - {name: "Net surplus before financing", components: ["Capital surplus", "Current surplus"]}
+  - {name: "Net debt",                    components: ["New Borrowing", "Debt Repayments"]}
+  - {name: "Net surplus",                 components: ["Net surplus before financing", "Net debt", "Budget loans balance"]}
+
+summary_row_order:
+  - "Tax"
+  - "Non-tax"
+  - "Transfers"
+  - "Current revenues"
+  - "Opex"
+  - "Operating surplus"
+  - "Interest"
+  - "Current surplus"
+  - "Capital revenues"
+  - "Capex"
+  - "Capital surplus"
+  - "Net surplus before financing"
+  - "New Borrowing"
+  - "Debt Repayments"
+  - "Net debt"
+  - "Budget loans balance"
+  - "Net surplus"
+  - "Interbudget loans"
+  - "Cash, bop"
+  - "Cash, eop"
 
 # Chart color schemes
 colors:
