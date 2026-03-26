@@ -12,7 +12,7 @@ import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/ic
 
 const kek_raw = await FileAttachment("data/classificators/KEKV.json").json();
 
-const expenses_econ = await FileAttachment("data/expenses.parquet").parquet()
+const expenses_econ = await FileAttachment("data/expenses.arrow").arrow()
   .then(t => [...t].map(r => ({
     CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
     FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), FAKT_AMT: r.FAKT_AMT

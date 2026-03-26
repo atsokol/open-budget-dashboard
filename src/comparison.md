@@ -12,20 +12,20 @@ import * as d3 from "npm:d3";
 import * as aq from "npm:arquero";
 import {HorizontalComparisonChart} from "./components/horizontal-comparison.js";
 
-const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
-const kek_raw  = await FileAttachment("data/classificators/KEKV.json").json();
-
-const incomes = await FileAttachment("data/incomes.parquet").parquet()
-  .then(t => [...t].map(r => ({
-    CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-    FUND_TYP: r.FUND_TYP, COD_INCO: Number(r.COD_INCO), FAKT_AMT: r.FAKT_AMT
-  })));
-
-const expenses_econ = await FileAttachment("data/expenses.parquet").parquet()
-  .then(t => [...t].map(r => ({
-    CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-    FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), FAKT_AMT: r.FAKT_AMT
-  })));
+const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
+  FileAttachment("data/classificators/KDB.json").json(),
+  FileAttachment("data/classificators/KEKV.json").json(),
+  FileAttachment("data/incomes.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_INCO: Number(r.COD_INCO), FAKT_AMT: r.FAKT_AMT
+    }))),
+  FileAttachment("data/expenses.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), FAKT_AMT: r.FAKT_AMT
+    })))
+]);
 ```
 
 ```js

@@ -12,7 +12,7 @@ import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/ic
 
 const fkv_raw = await FileAttachment("data/classificators/FKV.json").json();
 
-const expenses_func = await FileAttachment("data/expenses-functional.parquet").parquet()
+const expenses_func = await FileAttachment("data/expenses-functional.arrow").arrow()
   .then(t => [...t].map(r => ({
     CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
     FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK), FAKT_AMT: r.FAKT_AMT

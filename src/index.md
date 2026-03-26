@@ -12,45 +12,41 @@ import * as d3 from "npm:d3";
 import * as aq from "npm:arquero";
 import {buildCombiTable} from "./components/combi-tree.js";
 import {get_treetab_diff} from "./components/icicle.js";
-import {createWorkbook, addIcicleDiffSheet, addFlatSheet, addCurrentSurplusSheet, addCurrentSurplusDiffSheet, downloadWorkbook} from "./components/excel-export.js";
 
-const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
-const kek_raw  = await FileAttachment("data/classificators/KEKV.json").json();
-const fkv_raw  = await FileAttachment("data/classificators/FKV.json").json();
-
-const incomes = await FileAttachment("data/incomes.parquet").parquet()
-  .then(t => [...t].map(r => ({
-    CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-    FUND_TYP: r.FUND_TYP, COD_INCO: Number(r.COD_INCO), NAME_INC: r.NAME_INC,
-    ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
-  })));
-
-const expenses_econ = await FileAttachment("data/expenses.parquet").parquet()
-  .then(t => [...t].map(r => ({
-    CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-    FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK),
-    ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
-  })));
-
-const expenses_func = await FileAttachment("data/expenses-functional.parquet").parquet()
-  .then(t => [...t].map(r => ({
-    CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-    FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK),
-    ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
-  })));
-
-const debts = await FileAttachment("data/debts.parquet").parquet()
-  .then(t => [...t].map(r => ({
-    ...r,
-    REP_PERIOD: new Date(r.REP_PERIOD),
-    COD_FINA: r.COD_FINA != null ? Number(r.COD_FINA) : null
-  })));
-
-const credits = await FileAttachment("data/credits.parquet").parquet()
-  .then(t => [...t].map(r => ({
-    ...r,
-    REP_PERIOD: new Date(r.REP_PERIOD)
-  })));
+const [inck_raw, kek_raw, fkv_raw, incomes, expenses_econ, expenses_func, debts, credits] = await Promise.all([
+  FileAttachment("data/classificators/KDB.json").json(),
+  FileAttachment("data/classificators/KEKV.json").json(),
+  FileAttachment("data/classificators/FKV.json").json(),
+  FileAttachment("data/incomes.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_INCO: Number(r.COD_INCO), NAME_INC: r.NAME_INC,
+      ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
+    }))),
+  FileAttachment("data/expenses.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK),
+      ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
+    }))),
+  FileAttachment("data/expenses-functional.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK),
+      ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
+    }))),
+  FileAttachment("data/debts.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD), FUND_TYP: r.FUND_TYP,
+      COD_BUDGET: r.COD_BUDGET, COD_FINA: r.COD_FINA != null ? Number(r.COD_FINA) : null,
+      NAME_FIN: r.NAME_FIN, ZAT_AMT: r.ZAT_AMT, FAKT_AMT: r.FAKT_AMT
+    }))),
+  FileAttachment("data/credits.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD), FUND_TYP: r.FUND_TYP,
+      COD_BUDGET: r.COD_BUDGET, ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
+    })))
+]);
 ```
 
 ```js
@@ -642,6 +638,7 @@ const cs_flat      = buildCsFlatRows(incomes, expenses_econ, selectCity, yearTo,
 const cs_flat_diff = buildCsFlatDiffRows(incomes, expenses_econ, selectCity, yearTo, baseYearExport, month_max_export);
 
 async function downloadXlsx() {
+  const {createWorkbook, addIcicleDiffSheet, addFlatSheet, addCurrentSurplusSheet, addCurrentSurplusDiffSheet, downloadWorkbook} = await import("./components/excel-export.js");
   const wb = createWorkbook();
   const sheetHeader = ["CAT", "TYPE", ...columns.map(c => c.label)];
   if (hasBudget) sheetHeader.push(`Budget ${yearTo}`);

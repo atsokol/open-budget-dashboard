@@ -52,7 +52,7 @@ export function WaterfallChart(data, title, fmt, yLabel = "million UAH") {
       Plot.ruleY([0], {strokeDasharray: "1.5"}),
       plotLabel(data.filter(d => d.value >= 0), -7, fmt),
       plotLabel(data.filter(d => d.value < 0), 7, fmt),
-      Plot.axisX({label: null, lineWidth: 8.5, fontSize: 12, marginBottom: 70})
+      Plot.axisX({label: null, lineWidth: 7.5, fontSize: 12, marginBottom: 70})
     ]
   });
 }
@@ -97,7 +97,7 @@ export function WaterfallComparisonChart(data, title, fmt, yLabel = "million UAH
       Plot.ruleY([0], {strokeDasharray: "1.5"}),
       plotLabel(data.filter(d => d.value >= 0), -7, fmt),
       plotLabel(data.filter(d => d.value < 0), 7, fmt),
-      Plot.axisX({label: null, lineWidth: 8.5, fontSize: 12, marginBottom: 70})
+      Plot.axisX({label: null, lineWidth: 7, fontSize: 12, marginBottom: 70})
     ]
   });
 }
