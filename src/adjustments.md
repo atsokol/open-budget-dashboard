@@ -39,6 +39,19 @@ const kek_prep = Array.from(new Map(
     .map(d => [d.code, d])
 ).values()).sort((a, b) => a.code - b.code);
 
+// Load data to filter tree to codes present for the selected city
+const selectedCity = localStorage.getItem("selectedCity");
+const [inc_raw, exp_raw] = await Promise.all([
+  FileAttachment("data/incomes.arrow").arrow(),
+  FileAttachment("data/expenses.arrow").arrow()
+]);
+const presentIncCodes = new Set(
+  [...inc_raw].filter(r => !selectedCity || r.CITY === selectedCity).map(r => Number(r.COD_INCO))
+);
+const presentExpCodes = new Set(
+  [...exp_raw].filter(r => !selectedCity || r.CITY === selectedCity).map(r => Number(r.COD_CONS_EK))
+);
+
 // Default selections derived from config categories
 function categorize(code, cats) { for (const c of cats) if (code <= c.breakEnd) return c.name; return null; }
 const defaultCapIncCodes = inck_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryIncomeCategories) === "Capital revenues").map(d => d.code);
@@ -126,6 +139,7 @@ const incomeHierarchy = buildHierarchy(inck_prep.filter(d => d.level > 0));
   
   function renderNode(node, parentEl) {
     const descendantCodes = getDescendantCodes(node, inck_prep);
+    if (!descendantCodes.some(c => presentIncCodes.has(c))) return;
     const hasChildren = node.children && node.children.length > 0;
     
     const wrapper = document.createElement('div');
@@ -261,6 +275,7 @@ const expenseHierarchy = buildHierarchy(kek_prep.filter(d => d.level > 0));
   
   function renderNode(node, parentEl) {
     const descendantCodes = getDescendantCodes(node, kek_prep);
+    if (!descendantCodes.some(c => presentExpCodes.has(c))) return;
     const hasChildren = node.children && node.children.length > 0;
     
     const wrapper = document.createElement('div');

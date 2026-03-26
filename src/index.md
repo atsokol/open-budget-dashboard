@@ -364,16 +364,64 @@ const expModel = expModelRaw.map(r => ({
 const financialModel = [...incModel, ...expModel, ...finRows, ...credRows, ...cashRows]
   .filter(r => r.TYPE);
 
+// ── Capital Adjustments sheet (income + expense selected items) ──
+function buildCapAdjSheet(incData, expData, city, cols, incCatDefs, expCatDefs) {
+  const rows = [];
+
+  // Income
+  const incMap = new Map();
+  for (const d of incData.filter(d => d.CITY === city && d.FUND_TYP === "T")) {
+    if (!adjCatCodes.has(d.COD_INCO)) continue;
+    const name = d.NAME_INC;
+    if (!incMap.has(name)) incMap.set(name, {cat: categorize(d.COD_INCO, incCatDefs), code: d.COD_INCO, actuals: Object.fromEntries(cols.map(c => [c.key, 0])), budget: 0});
+    const entry = incMap.get(name);
+    const year = d.REP_PERIOD.getUTCFullYear();
+    const month = d.REP_PERIOD.getUTCMonth() + 1;
+    for (const col of cols) {
+      if (year === col.year && month === col.month) entry.actuals[col.key] += (d.FAKT_AMT || 0) / 1e6;
+    }
+    if (year === yearTo && d.REP_PERIOD.getUTCMonth() === budgetMonth) entry.budget += (d.ZAT_AMT || 0) / 1e6;
+  }
+  for (const [name, data] of [...incMap.entries()].sort((a, b) => a[1].code - b[1].code)) {
+    const obj = {GROUP: "Income", CAT: data.cat, TYPE: name, CODE: data.code};
+    for (const col of cols) obj[col.label] = data.actuals[col.key];
+    if (budgetMonth >= 0) obj[`Budget ${yearTo}`] = data.budget;
+    rows.push(obj);
+  }
+
+  // Expense
+  const expMap = new Map();
+  for (const d of expData.filter(d => d.CITY === city && d.FUND_TYP === "T")) {
+    if (!capExpSet.has(d.COD_CONS_EK)) continue;
+    const code = d.COD_CONS_EK;
+    if (!expMap.has(code)) expMap.set(code, {cat: categorize(code, expCatDefs), code, actuals: Object.fromEntries(cols.map(c => [c.key, 0])), budget: 0});
+    const entry = expMap.get(code);
+    const year = d.REP_PERIOD.getUTCFullYear();
+    const month = d.REP_PERIOD.getUTCMonth() + 1;
+    for (const col of cols) {
+      if (year === col.year && month === col.month) entry.actuals[col.key] += (d.FAKT_AMT || 0) / 1e6;
+    }
+    if (year === yearTo && d.REP_PERIOD.getUTCMonth() === budgetMonth) entry.budget += (d.ZAT_AMT || 0) / 1e6;
+  }
+  for (const [code, data] of [...expMap.entries()].sort((a, b) => a[0] - b[0])) {
+    const obj = {GROUP: "Expense", CAT: data.cat, TYPE: kekNameByCode.get(code) ?? String(code), CODE: code};
+    for (const col of cols) obj[col.label] = data.actuals[col.key];
+    if (budgetMonth >= 0) obj[`Budget ${yearTo}`] = data.budget;
+    rows.push(obj);
+  }
+
+  return rows;
+}
+
 // ── Transfers and Capital Grants detail sheets (for XLSX) ──
 function buildDetailSheet(incData, city, cols, catDefs, filterType) {
   const filtered = incData.filter(d => d.CITY === city && d.FUND_TYP === "T");
   const nameMap = new Map();
   for (const d of filtered) {
-    let type = categorize(d.COD_INCO, catDefs);
-    if (adjCatCodes.has(d.COD_INCO)) type = "Capital grants";
+    const type = categorize(d.COD_INCO, catDefs);
     if (type !== filterType) continue;
     const name = d.NAME_INC;
-    if (!nameMap.has(name)) nameMap.set(name, {actuals: Object.fromEntries(cols.map(c => [c.key, 0])), budget: 0});
+    if (!nameMap.has(name)) nameMap.set(name, {code: d.COD_INCO, actuals: Object.fromEntries(cols.map(c => [c.key, 0])), budget: 0});
     const entry = nameMap.get(name);
     const year = d.REP_PERIOD.getUTCFullYear();
     const month = d.REP_PERIOD.getUTCMonth() + 1;
@@ -390,6 +438,7 @@ function buildDetailSheet(incData, city, cols, catDefs, filterType) {
   });
 }
 
+const capAdjSheet = buildCapAdjSheet(incomes, expenses_econ, selectCity, columns, modelIncCat, modelExpCat);
 const transfersSheet = buildDetailSheet(incomes, selectCity, columns, modelIncCat, "Transfers");
 const capitalGrantsSheet = buildDetailSheet(incomes, selectCity, columns, modelIncCat, "Capital grants");
 ```
@@ -642,12 +691,17 @@ async function downloadXlsx() {
   const wb = createWorkbook();
   const sheetHeader = ["CAT", "TYPE", ...columns.map(c => c.label)];
   if (hasBudget) sheetHeader.push(`Budget ${yearTo}`);
+  const detailSheetHeader = ["CAT", "TYPE", "CODE", ...columns.map(c => c.label)];
+  if (hasBudget) detailSheetHeader.push(`Budget ${yearTo}`);
+  const capAdjSheetHeader = ["GROUP", "CAT", "TYPE", "CODE", ...columns.map(c => c.label)];
+  if (hasBudget) capAdjSheetHeader.push(`Budget ${yearTo}`);
 
   // Financial summary sheets
   addFlatSheet(wb, summarySheetData,   "Financial Summary", sheetHeader);
   addFlatSheet(wb, modelSheetData,     "Financial Model",   sheetHeader);
   addFlatSheet(wb, capitalGrantsSheet, "Capital Grants",    sheetHeader);
   addFlatSheet(wb, transfersSheet,     "Transfers",         sheetHeader);
+  addFlatSheet(wb, capAdjSheet,        "Capital adjustments", capAdjSheetHeader);
 
   // Current surplus 3-level breakdown sheets (after Transfers)
   addCurrentSurplusSheet(wb, cs_flat, "Current surplus", {colLabel: `${periodLabel} ${yearTo} (UAH mn)`});

@@ -137,7 +137,7 @@ export function addIcicleDiffSheet(wb, flatData, sheetName, {currentYear, baseYe
       rules: [{
         type: "colorScale",
         cfvo: [{type: "min"}, {type: "num", value: 0}, {type: "max"}],
-        color: [{argb: "FFF8696B"}, {argb: "FFFFEB84"}, {argb: "FF63BE7B"}]
+        color: [{argb: "FFF8696B"}, {argb: "FFFFFFFF"}, {argb: "FF63BE7B"}]
       }]
     });
   }
@@ -265,7 +265,7 @@ export function addCurrentSurplusDiffSheet(wb, rows, sheetName, {currentYear, ba
       rules: [{
         type: "colorScale",
         cfvo: [{type: "min"}, {type: "num", value: 0}, {type: "max"}],
-        color: [{argb: "FFF8696B"}, {argb: "FFFFEB84"}, {argb: "FF63BE7B"}]
+        color: [{argb: "FFF8696B"}, {argb: "FFFFFFFF"}, {argb: "FF63BE7B"}]
       }]
     });
   }
