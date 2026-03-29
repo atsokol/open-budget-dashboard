@@ -70,9 +70,10 @@ const fkvNameByCode  = new Map(fkv_prep.map(d => [d.code, d.name]));
 
 // Category definitions loaded from config.yaml
 const cfg = await FileAttachment("data/config.json").json();
-const updateIncCat = cfg.summaryIncomeCategories;
-const updateExpCat = cfg.summaryExpenseCategories;
-const modelIncCat  = cfg.modelIncomeCategories;
+const updateIncCat  = cfg.summaryIncomeCategories;
+const displayIncCat = cfg.displayIncomeCategories;
+const updateExpCat  = cfg.summaryExpenseCategories;
+const modelIncCat   = cfg.modelIncomeCategories;
 const modelExpCat  = cfg.modelExpenseCategories;
 const financingCodeMap = Object.fromEntries(Object.entries(cfg.financingCodes).map(([k,v]) => [Number(k), v]));
 const cashCodeMap      = Object.fromEntries(Object.entries(cfg.cashCodes).map(([k,v]) => [Number(k), v]));
@@ -212,13 +213,20 @@ const budgetMonth = Math.max(...incomes
 const hasBudget = budgetMonth >= 0;
 
 // Aggregate data by cut-based categories, returning [{TYPE, CAT, actuals:{colKey:val}, budget}]
-function aggByCut(data, codeField, catDefs, city, cols, adjCodes, adjLabel) {
+// naturalCats: optional summary-level catDefs used to guard adjCodes overrides.
+// When provided, the adjLabel override only fires if the display type (from catDefs) matches
+// the natural summary type — preventing named display sub-categories (e.g. "Interest received")
+// from being collapsed back into the adjLabel group.
+function aggByCut(data, codeField, catDefs, city, cols, adjCodes, adjLabel, naturalCats) {
   const filtered = data.filter(d => d.CITY === city && d.FUND_TYP === "T");
   const typeSums = new Map();
   const typeBudgets = new Map();
   for (const d of filtered) {
     let type = categorize(d[codeField], catDefs);
-    if (adjCodes && adjCodes.has(d[codeField])) type = adjLabel;
+    if (adjCodes && adjCodes.has(d[codeField])) {
+      const naturalType = naturalCats ? categorize(d[codeField], naturalCats) : type;
+      if (naturalType === type) type = adjLabel;
+    }
     if (!type) continue;
     const year = d.REP_PERIOD.getUTCFullYear();
     const month = d.REP_PERIOD.getUTCMonth() + 1;
@@ -258,7 +266,8 @@ function aggFinancing(debtsData, city, cols) {
       typeBudgets.set(type, (typeBudgets.get(type) || 0) + (d.ZAT_AMT || 0) / 1e6);
     }
   }
-  return [...new Set([...typeSums.keys(), ...typeBudgets.keys()])].map(type => ({
+  const allTypes = new Set([...Object.values(codeMap), ...typeSums.keys(), ...typeBudgets.keys()]);
+  return [...allTypes].map(type => ({
     TYPE: type, CAT: "Financing",
     actuals: Object.fromEntries(cols.map(c => [c.key, (typeSums.get(type) || {})[c.key] || 0])),
     budget: typeBudgets.get(type) || 0
@@ -311,7 +320,7 @@ function aggCredits(creditsData, city, cols) {
 }
 
 // ── Financial Summary (SUMMARY_UPDATE matching R) ──
-const incUpdate = aggByCut(incomes, "COD_INCO", updateIncCat, selectCity, columns, adjCatCodes, "Capital revenues");
+const incUpdate = aggByCut(incomes, "COD_INCO", displayIncCat, selectCity, columns, adjCatCodes, "Capital revenues", updateIncCat);
 incUpdate.forEach(r => r.CAT = "Income");
 
 const expUpdateRaw = aggByCut(expenses_econ, "COD_CONS_EK", updateExpCat, selectCity, columns, capExpSet, "Capital expenditures");
@@ -354,6 +363,35 @@ function buildSummaryTemplate(allRows, cols) {
 const financialSummary = buildSummaryTemplate(
   [...incUpdate, ...expUpdate, ...finRows, ...credRows, ...cashRows], columns
 );
+
+// ── Summary Financials sheet: annual (FY) + period (Nm) column sets ──
+// annualSummaryCols: FY for yearFrom..yearTo-1 (current budget year shown as Budget column)
+// periodSummaryCols: effectiveMonth for yearFrom..yearTo (all years at the same YTD cutoff)
+const annualSummaryCols = d3.range(yearFrom, yearTo).map(y => ({
+  year: y, month: 12, key: `s_ann_${y}`, label: String(y)
+}));
+const periodSummaryCols = d3.range(yearFrom, yearTo + 1).map(y => ({
+  year: y, month: effectiveMonth, key: `s_per_${y}`,
+  label: effectiveMonth === 12 ? String(y) : `${effectiveMonth}m ${y}`
+}));
+
+function buildSummaryForCols(cols) {
+  const incR = aggByCut(incomes, "COD_INCO", displayIncCat, selectCity, cols, adjCatCodes, "Capital revenues", updateIncCat);
+  incR.forEach(r => r.CAT = "Income");
+  const expRaw = aggByCut(expenses_econ, "COD_CONS_EK", updateExpCat, selectCity, cols, capExpSet, "Capital expenditures");
+  const expR = expRaw.map(r => ({
+    ...r, CAT: "Expense",
+    actuals: Object.fromEntries(Object.entries(r.actuals).map(([k, v]) => [k, -v])),
+    budget: -r.budget
+  }));
+  const finR  = aggFinancing(debts, selectCity, cols);
+  const credR = aggCredits(credits, selectCity, cols);
+  const cashR = aggCash(debts, selectCity, cols);
+  return buildSummaryTemplate([...incR, ...expR, ...finR, ...credR, ...cashR], cols);
+}
+
+const fsAnnual = buildSummaryForCols(annualSummaryCols);
+const fsPeriod = buildSummaryForCols(periodSummaryCols);
 
 // ── Financial Model (SUMMARY_MODEL matching R) ──
 const incModel = aggByCut(incomes, "COD_INCO", modelIncCat, selectCity, columns, adjCatCodes, "Capital grants");
@@ -482,7 +520,7 @@ display(html`<table style="width:100%; border-collapse:collapse; font-size:14px;
   <tbody>
     ${displayData.map(r => {
       const isTotal = r.CAT === "Total" || totalTypes.has(r.TYPE);
-      const isHighlighted = r.TYPE === "Current surplus" || r.TYPE === "Net surplus";
+      const isHighlighted = r.TYPE === "Current surplus" || r.TYPE === "Net surplus" || r.TYPE === "Net surplus before financing";
       const rowStyle = isTotal
         ? `font-weight:700; border-top:1px solid var(--theme-foreground-faint)${isHighlighted ? "; background:#fffde7" : ""}`
         : "";
@@ -493,6 +531,21 @@ display(html`<table style="width:100%; border-collapse:collapse; font-size:14px;
         ${hasBudget ? html`<td style="${colStyle}">${fmt0(r.budget || 0)}</td>` : ""}
       </tr>`;
     })}
+    <tr style="border-top:2px solid var(--theme-foreground-faint)">
+      <td colspan="2" style="padding:4px 8px; font-style:italic; font-size:12px">Check</td>
+      ${columns.map(c => {
+        const get = type => (financialSummary.find(r => r.TYPE === type)?.actuals[c.key] || 0);
+        const diff = Math.abs(get("Cash, eop") - get("Cash, bop") - get("Net surplus") - get("Interbudget loans") - get("Deposit operations"));
+        const ok = diff < 0.5;
+        return html`<td style="${colStyle}; color:${ok ? "#2e8b57" : "#dc143c"}; font-style:italic; font-size:12px">${ok ? "TRUE" : "FALSE"}</td>`;
+      })}
+      ${hasBudget ? (() => {
+        const getb = type => (financialSummary.find(r => r.TYPE === type)?.budget || 0);
+        const diff = Math.abs(getb("Cash, eop") - getb("Cash, bop") - getb("Net surplus") - getb("Interbudget loans") - getb("Deposit operations"));
+        const ok = diff < 0.5;
+        return html`<td style="${colStyle}; color:${ok ? "#2e8b57" : "#dc143c"}; font-style:italic; font-size:12px">${ok ? "TRUE" : "FALSE"}</td>`;
+      })() : ""}
+    </tr>
   </tbody>
 </table>
 <p style="color:var(--theme-foreground-muted); font-size:12px; margin-top:8px">Values in million UAH.</p>`);
@@ -691,8 +744,164 @@ function buildCsFlatDiffRows(incData, expData, city, selectYear, baseYear, month
 const cs_flat      = buildCsFlatRows(incomes, expenses_econ, selectCity, yearTo, month_max_export);
 const cs_flat_diff = buildCsFlatDiffRows(incomes, expenses_econ, selectCity, yearTo, baseYearExport, month_max_export);
 
+// ── Financial Summary Breakdown — 3-level disaggregation of every summary row ──
+// Level 1: financial summary TYPE (Tax revenues, Operating expenditures, etc.)
+// Level 2: model sub-category within each type
+// Level 3: individual code
+// Computed totals (Current revenues, Current surplus, …) appear as isTotal level-1 rows.
+function buildSummaryBreakdownRows(incData, expData, debtsData, creditsData, city, cols, summaryData) {
+  function zeroActuals() { return Object.fromEntries(cols.map(c => [c.key, 0])); }
+
+  // Income: type → modelCat → code → entry
+  const incAgg = {};
+  for (const d of incData.filter(d => d.CITY === city && d.FUND_TYP === "T")) {
+    const type = categorize(d.COD_INCO, displayIncCat);
+    if (!type) continue;
+    const mc = categorize(d.COD_INCO, modelIncCat) || type;
+    if (!incAgg[type]) incAgg[type] = {};
+    if (!incAgg[type][mc]) incAgg[type][mc] = {};
+    const code = d.COD_INCO;
+    if (!incAgg[type][mc][code]) incAgg[type][mc][code] = { name: inckNameByCode.get(code) || d.NAME_INC || `Code ${code}`, actuals: zeroActuals(), budget: 0 };
+    const e = incAgg[type][mc][code];
+    const yr = d.REP_PERIOD.getUTCFullYear(), mo = d.REP_PERIOD.getUTCMonth() + 1;
+    for (const col of cols) {
+      if (yr === col.year && mo === col.month) e.actuals[col.key] += (d.FAKT_AMT || 0) / 1e6;
+    }
+    if (yr === yearTo && d.REP_PERIOD.getUTCMonth() === budgetMonth) e.budget += (d.ZAT_AMT || 0) / 1e6;
+  }
+
+  // Expenses: type → modelCat → code → entry (values negated)
+  const expAgg = {};
+  for (const d of expData.filter(d => d.CITY === city && d.FUND_TYP === "T")) {
+    const type = categorize(d.COD_CONS_EK, updateExpCat);
+    if (!type) continue;
+    const mc = categorize(d.COD_CONS_EK, modelExpCat) || type;
+    if (!expAgg[type]) expAgg[type] = {};
+    if (!expAgg[type][mc]) expAgg[type][mc] = {};
+    const code = d.COD_CONS_EK;
+    if (!expAgg[type][mc][code]) expAgg[type][mc][code] = { name: kekNameByCode.get(code) || `Code ${code}`, actuals: zeroActuals(), budget: 0 };
+    const e = expAgg[type][mc][code];
+    const yr = d.REP_PERIOD.getUTCFullYear(), mo = d.REP_PERIOD.getUTCMonth() + 1;
+    for (const col of cols) {
+      if (yr === col.year && mo === col.month) e.actuals[col.key] -= (d.FAKT_AMT || 0) / 1e6;
+    }
+    if (yr === yearTo && d.REP_PERIOD.getUTCMonth() === budgetMonth) e.budget -= (d.ZAT_AMT || 0) / 1e6;
+  }
+
+  // Financing & cash: type → NAME_FIN key → entry
+  // Replicates aggFinancing/aggCash sign conventions; Budget loans balance uses credits (negated).
+  const finBreak = {};
+  for (const d of debtsData.filter(d => d.CITY === city && d.FUND_TYP === "T")) {
+    const codeFina = d.COD_FINA != null ? Number(d.COD_FINA) : null;
+    if (codeFina == null) continue;
+    const typeName = financingCodeMap[codeFina] || cashCodeMap[codeFina];
+    if (!typeName) continue;
+    const isCash = !!cashCodeMap[codeFina];
+    const nameKey = (d.NAME_FIN && d.NAME_FIN.trim()) ? d.NAME_FIN.trim() : `Code ${d.COD_BUDGET ?? codeFina}`;
+    if (!finBreak[typeName]) finBreak[typeName] = {};
+    if (!finBreak[typeName][nameKey]) {
+      finBreak[typeName][nameKey] = { name: nameKey, code: d.COD_FINA ?? null, actuals: zeroActuals(), budget: 0 };
+    }
+    const e = finBreak[typeName][nameKey];
+    const yr = d.REP_PERIOD.getUTCFullYear(), mo = d.REP_PERIOD.getUTCMonth() + 1;
+    const fakt = isCash ? Math.abs(d.FAKT_AMT || 0) : (d.FAKT_AMT || 0);
+    const plan = isCash ? Math.abs(d.ZAT_AMT || 0) : (d.ZAT_AMT || 0);
+    for (const col of cols) {
+      if (yr === col.year && mo === col.month) e.actuals[col.key] += fakt / 1e6;
+    }
+    if (yr === yearTo && d.REP_PERIOD.getUTCMonth() === budgetMonth) e.budget += plan / 1e6;
+  }
+  // Budget loans balance from credits (negated, matching aggCredits)
+  const BLB = "Budget loans balance";
+  finBreak[BLB] = {};
+  for (const d of creditsData.filter(d => d.CITY === city && d.FUND_TYP === "T")) {
+    const nameKey = d.COD_BUDGET != null ? String(d.COD_BUDGET) : "unknown";
+    if (!finBreak[BLB][nameKey]) {
+      finBreak[BLB][nameKey] = { name: "", code: d.COD_BUDGET ?? null, actuals: zeroActuals(), budget: 0 };
+    }
+    const e = finBreak[BLB][nameKey];
+    const yr = d.REP_PERIOD.getUTCFullYear(), mo = d.REP_PERIOD.getUTCMonth() + 1;
+    for (const col of cols) {
+      if (yr === col.year && mo === col.month) e.actuals[col.key] -= (d.FAKT_AMT || 0) / 1e6;
+    }
+    if (yr === yearTo && d.REP_PERIOD.getUTCMonth() === budgetMonth) e.budget -= (d.ZAT_AMT || 0) / 1e6;
+  }
+
+  function sumGroup(typeEntry) {
+    const totals = zeroActuals(); let bud = 0;
+    for (const mc of Object.values(typeEntry)) {
+      for (const e of Object.values(mc)) {
+        for (const k of Object.keys(totals)) totals[k] += e.actuals[k] || 0;
+        bud += e.budget;
+      }
+    }
+    return { actuals: totals, budget: bud };
+  }
+  function sumMc(mcEntry) {
+    const totals = zeroActuals(); let bud = 0;
+    for (const e of Object.values(mcEntry)) {
+      for (const k of Object.keys(totals)) totals[k] += e.actuals[k] || 0;
+      bud += e.budget;
+    }
+    return { actuals: totals, budget: bud };
+  }
+
+  const totalTypeSet = new Set(summaryTotals.map(t => t.name));
+  const incMcOrder   = [...new Map(modelIncCat.map(d => [d.name, true])).keys()];
+  const expMcOrder   = [...new Map(modelExpCat.map(d => [d.name, true])).keys()];
+
+  const rows = [];
+  for (const typeName of summaryRowOrder) {
+    if (totalTypeSet.has(typeName)) {
+      // Computed total — pull value from financialSummary
+      const sr = summaryData.find(r => r.TYPE === typeName);
+      if (sr) rows.push({ level: 1, name: typeName, cat: "Total", code: null, isTotal: true, actuals: {...sr.actuals}, budget: sr.budget || 0 });
+    } else if (incAgg[typeName]) {
+      const {actuals, budget} = sumGroup(incAgg[typeName]);
+      rows.push({ level: 1, name: typeName, cat: "Income", code: null, isTotal: false, actuals, budget });
+      const sortedMcs = Object.keys(incAgg[typeName]).sort((a, b) => incMcOrder.indexOf(a) - incMcOrder.indexOf(b));
+      for (const mc of sortedMcs) {
+        const mcData = incAgg[typeName][mc];
+        const {actuals: mca, budget: mcb} = sumMc(mcData);
+        rows.push({ level: 2, name: mc, cat: "", code: null, isTotal: false, actuals: mca, budget: mcb });
+        for (const code of Object.keys(mcData).map(Number).sort((a, b) => a - b)) {
+          const e = mcData[code];
+          rows.push({ level: 3, name: e.name, cat: "", code, isTotal: false, actuals: {...e.actuals}, budget: e.budget });
+        }
+      }
+    } else if (expAgg[typeName]) {
+      const {actuals, budget} = sumGroup(expAgg[typeName]);
+      rows.push({ level: 1, name: typeName, cat: "Expense", code: null, isTotal: false, actuals, budget });
+      const sortedMcs = Object.keys(expAgg[typeName]).sort((a, b) => expMcOrder.indexOf(a) - expMcOrder.indexOf(b));
+      for (const mc of sortedMcs) {
+        const mcData = expAgg[typeName][mc];
+        const {actuals: mca, budget: mcb} = sumMc(mcData);
+        rows.push({ level: 2, name: mc, cat: "", code: null, isTotal: false, actuals: mca, budget: mcb });
+        for (const code of Object.keys(mcData).map(Number).sort((a, b) => a - b)) {
+          const e = mcData[code];
+          rows.push({ level: 3, name: e.name, cat: "", code, isTotal: false, actuals: {...e.actuals}, budget: e.budget });
+        }
+      }
+    } else if (finBreak[typeName] && Object.keys(finBreak[typeName]).length > 0) {
+      // Financing / cash — level-1 total from financialSummary; level-2 from raw aggregation
+      const sr = summaryData.find(r => r.TYPE === typeName);
+      if (sr) {
+        rows.push({ level: 1, name: typeName, cat: sr.CAT || "", code: null, isTotal: false, actuals: {...sr.actuals}, budget: sr.budget || 0 });
+        for (const e of Object.values(finBreak[typeName]).sort((a, b) => (a.name > b.name ? 1 : -1))) {
+          rows.push({ level: 2, name: e.name, cat: "", code: e.code, isTotal: false, actuals: {...e.actuals}, budget: e.budget });
+        }
+      }
+    } else {
+      const sr = summaryData.find(r => r.TYPE === typeName);
+      if (sr) rows.push({ level: 1, name: typeName, cat: sr.CAT || "", code: null, isTotal: false, actuals: {...sr.actuals}, budget: sr.budget || 0 });
+    }
+  }
+  return rows;
+}
+
+
 async function downloadXlsx() {
-  const {createWorkbook, addIcicleDiffSheet, addFlatSheet, addCurrentSurplusSheet, addCurrentSurplusDiffSheet, downloadWorkbook} = await import("./components/excel-export.js");
+  const {createWorkbook, addIcicleDiffSheet, addFlatSheet, appendIdentityCheckRow, addCurrentSurplusSheet, addCurrentSurplusDiffSheet, addSummaryFinancialsSheet, addSummaryBreakdownSheet, downloadWorkbook} = await import("./components/excel-export.js");
   const wb = createWorkbook();
   const sheetHeader = ["CAT", "TYPE", ...columns.map(c => c.label)];
   if (hasBudget) sheetHeader.push(`Budget ${yearTo}`);
@@ -701,8 +910,11 @@ async function downloadXlsx() {
   const capAdjSheetHeader = ["GROUP", "CAT", "TYPE", "CODE", ...columns.map(c => c.label)];
   if (hasBudget) capAdjSheetHeader.push(`Budget ${yearTo}`);
 
-  // Financial summary sheets
-  addFlatSheet(wb, summarySheetData,   "Financial Summary", sheetHeader);
+  // Financial summary sheet (4-table layout)
+  addSummaryFinancialsSheet(wb, fsAnnual, fsPeriod, annualSummaryCols, periodSummaryCols, {hasBudget, yearTo});
+  const sbAnnual = buildSummaryBreakdownRows(incomes, expenses_econ, debts, credits, selectCity, annualSummaryCols, fsAnnual);
+  const sbPeriod = buildSummaryBreakdownRows(incomes, expenses_econ, debts, credits, selectCity, periodSummaryCols, fsPeriod);
+  addSummaryBreakdownSheet(wb, sbAnnual, sbPeriod, annualSummaryCols, periodSummaryCols, "Financial summary breakdown", {hasBudget, yearTo});
   addFlatSheet(wb, modelSheetData,     "Financial Model",   sheetHeader);
   addFlatSheet(wb, capitalGrantsSheet, "Capital Grants",    sheetHeader);
   addFlatSheet(wb, transfersSheet,     "Transfers",         sheetHeader);

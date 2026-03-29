@@ -16,28 +16,28 @@ model_income_categories:
   - {name: "Unified income tax",                breakEnd: 18059999, parent: "Tax revenues"}
   - {name: "Other tax revenues",                breakEnd: 19999999, parent: "Tax revenues"}
   - {name: "Other non-tax revenues",            breakEnd: 21010499, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 21010599, parent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 21010599, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
   - {name: "Other non-tax revenues",            breakEnd: 21010699, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 21011199, parent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 21011199, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
   - {name: "Other non-tax revenues",            breakEnd: 21049999, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 21050001, parent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 21050001, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
   - {name: "Other non-tax revenues",            breakEnd: 24109999, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 24119999, parent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 24119999, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
   - {name: "Other non-tax revenues",            breakEnd: 29999999, parent: "Non-tax revenues"}
-  - {name: "Sale of assets",                    breakEnd: 39999999, parent: "Capital revenues"}
+  - {name: "Sale of assets",                    breakEnd: 39999999, parent: "Sale of assets",         grandparent: "Capital revenues"}
   - {name: "Transfers",                         breakEnd: 41999999, parent: "Transfers"}
-  - {name: "Capital grants",                    breakEnd: 42999999, parent: "Capital revenues"}
+  - {name: "Capital grants",                    breakEnd: 42999999, parent: "Other capital revenues", grandparent: "Capital revenues"}
   - {name: "Transfers",                         breakEnd: 49999999, parent: "Transfers"}
-  - {name: "Target funds",                      breakEnd: 59999999, parent: "Capital revenues"}  # Цільові фонди (codes 50000000+)
+  - {name: "Target funds",                      breakEnd: 59999999, parent: "Other capital revenues", grandparent: "Capital revenues"}  # Цільові фонди (codes 50000000+)
 
 model_expense_categories:
-  - {name: "Staff Costs",                        breakEnd: 2199,  parent: "Operating expenditures"}
+  - {name: "Staff Costs",                       breakEnd: 2199,  parent: "Operating expenditures"}
   - {name: "Purchase of materials",             breakEnd: 2249,  parent: "Operating expenditures"}
   - {name: "Current discretionary expenditure", breakEnd: 2269,  parent: "Operating expenditures"}
   - {name: "Utility payments",                  breakEnd: 2279,  parent: "Operating expenditures"}
   - {name: "Capital expenditures",              breakEnd: 2281,  parent: "Capital expenditures"}
   - {name: "Current discretionary expenditure", breakEnd: 2399,  parent: "Operating expenditures"}
-  - {name: "Interest paid",                     breakEnd: 2599,  parent: "Interest"}
+  - {name: "Interest paid",                     breakEnd: 2599,  parent: "Interest paid"}
   - {name: "Transfer to legal entities",        breakEnd: 2619,  parent: "Operating expenditures"}
   - {name: "Transfers to other budgets",        breakEnd: 2699,  parent: "Operating expenditures"}
   - {name: "Transfer to residents",             breakEnd: 2799,  parent: "Operating expenditures"}
@@ -49,8 +49,9 @@ model_expense_categories:
 
 # ── Financing / cash code mappings (from debts dataset) ──
 financing_codes:
-  401000: "New Borrowing"
+  401000: "New Borrowings"
   402000: "Debt Repayments"
+  601000: "Deposit operations"
   602300: "Interbudget loans"
 
 cash_codes:
@@ -61,10 +62,11 @@ cash_codes:
 summary_totals:
   - {name: "Current revenues",            components: ["Tax revenues", "Non-tax revenues", "Transfers"]}
   - {name: "Operating surplus",           components: ["Current revenues", "Operating expenditures"]}
-  - {name: "Current surplus",             components: ["Operating surplus", "Interest"]}
+  - {name: "Current surplus",             components: ["Operating surplus", "Interest paid"]}
+  - {name: "Capital revenues",             components: ["Interest received", "Sale of assets", "Other capital revenues"]}
   - {name: "Capital surplus",             components: ["Capital revenues", "Capital expenditures"]}
   - {name: "Net surplus before financing", components: ["Capital surplus", "Current surplus"]}
-  - {name: "Net debt",                    components: ["New Borrowing", "Debt Repayments"]}
+  - {name: "Net debt",                    components: ["New Borrowings", "Debt Repayments"]}
   - {name: "Net surplus",                 components: ["Net surplus before financing", "Net debt", "Budget loans balance"]}
 
 summary_row_order:
@@ -74,18 +76,20 @@ summary_row_order:
   - "Current revenues"
   - "Operating expenditures"
   - "Operating surplus"
-  - "Interest"
+  - "Interest paid"
   - "Current surplus"
+  - "Interest received"
+  - "Sale of assets"
+  - "Other capital revenues"
   - "Capital revenues"
   - "Capital expenditures"
-  - "Capital surplus"
   - "Net surplus before financing"
-  - "New Borrowing"
+  - "New Borrowings"
   - "Debt Repayments"
-  - "Net debt"
   - "Budget loans balance"
   - "Net surplus"
   - "Interbudget loans"
+  - "Deposit operations"
   - "Cash, bop"
   - "Cash, eop"
 

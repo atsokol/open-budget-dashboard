@@ -401,7 +401,7 @@ const expenseHierarchy = buildHierarchy(kek_prep.filter(d => d.level > 0));
     <p>Go to the main dashboard to see the results</p>
     ${Inputs.button("View Dashboard →", {
       reduce: () => {
-        window.location.href = "./budget-dashboard";
+        window.location.href = "/";
       }
     })}
   </div>

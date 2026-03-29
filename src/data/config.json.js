@@ -14,22 +14,30 @@ const config = yaml.load(configYaml);
 
 // ── Hierarchy derivation ──────────────────────────────────────────────────────
 
-// Derive summary (parent-level) categorization list from an annotated model list.
-// Algorithm: run-length encode the `parent` field — when the parent name changes,
-// emit a new summary entry. Within a run of the same parent, update breakEnd to
-// the last (largest) breakEnd in the run.
-// Result: categorize(code, derived) === categorize(code, original_summary) for all codes.
-function deriveSummaryCategories(modelCats) {
+// Run-length encode a name field over the ordered model category list into a flat breakEnd array.
+// Result: categorize(code, derived) correctly maps codes using the first matching breakEnd.
+function deriveCategories(modelCats, nameFn) {
   const result = [];
   for (const entry of modelCats) {
+    const name = nameFn(entry);
     const last = result[result.length - 1];
-    if (last && last.name === entry.parent) {
+    if (last && last.name === name) {
       last.breakEnd = entry.breakEnd;
     } else {
-      result.push({ name: entry.parent, breakEnd: entry.breakEnd });
+      result.push({ name, breakEnd: entry.breakEnd });
     }
   }
   return result;
+}
+
+// Summary (fiscal group) level: grandparent ?? parent — used by adjustments to detect capital codes.
+function deriveSummaryCategories(modelCats) {
+  return deriveCategories(modelCats, e => e.grandparent || e.parent);
+}
+
+// Display level: parent — produces named sub-rows (Interest received, Sale of assets, etc.).
+function deriveDisplayCategories(modelCats) {
+  return deriveCategories(modelCats, e => e.parent);
 }
 
 // Build a hierarchy index: { summaryName: [modelName, ...] } with unique ordered model names.
@@ -70,6 +78,9 @@ const result = {
   // Summary-level — derived from model (eliminates the old manual summary_* lists)
   summaryIncomeCategories:    deriveSummaryCategories(modelIncomeCats),
   summaryExpenseCategories:   deriveSummaryCategories(modelExpenseCats),
+
+  // Display-level — like summary but uses display_parent where set, creating named sub-rows
+  displayIncomeCategories:    deriveDisplayCategories(modelIncomeCats),
 
   // Annotated model lists — include parent field for per-row hierarchy lookups
   annotatedIncomeCategories:  modelIncomeCats,
