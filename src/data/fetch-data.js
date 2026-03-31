@@ -11,11 +11,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASE_URL = "https://raw.githubusercontent.com/atsokol/openbudget-data-update/main/data/parquet";
 
 const FILES = [
-  { remote: "incomes.parquet",              local: "incomes.parquet" },
-  { remote: "expenses.parquet",             local: "expenses.parquet" },
-  { remote: "expenses_functional.parquet",  local: "expenses-functional.parquet" },
-  { remote: "debts.parquet",                local: "debts.parquet" },
-  { remote: "credits.parquet",              local: "credits.parquet" },
+  { remote: "incomes.parquet",                        local: "incomes.parquet" },
+  { remote: "expenses.parquet",                       local: "expenses.parquet" },
+  { remote: "expenses_functional.parquet",            local: "expenses-functional.parquet" },
+  { remote: "expenses_functional_economic.parquet",   local: "expenses-functional-economic.parquet" },
+  { remote: "debts.parquet",                          local: "debts.parquet" },
+  { remote: "credits.parquet",                        local: "credits.parquet" },
 ];
 
 for (const { remote, local } of FILES) {

@@ -21,3 +21,5 @@ src/data/*.parquet
 
 # Other 
 notebook/
+data-structure_files
+data-structure.*

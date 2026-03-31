@@ -90,6 +90,7 @@ const result = {
   incomeHierarchy:            buildHierarchyIndex(modelIncomeCats),
   expenseHierarchy:           buildHierarchyIndex(modelExpenseCats),
 
+  reverseSubsidyFkvCode:      config.reverse_subsidy_fkv_code,
   financingCodes:             config.financing_codes,
   cashCodes:                  config.cash_codes,
   summaryTotals:              config.summary_totals,

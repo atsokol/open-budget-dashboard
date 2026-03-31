@@ -10,13 +10,21 @@ import * as d3 from "npm:d3";
 import {TrendsChart} from "./components/trends-chart.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
 
-const fkv_raw = await FileAttachment("data/classificators/FKV.json").json();
-
-const expenses_func = await FileAttachment("data/expenses-functional.arrow").arrow()
-  .then(t => [...t].map(r => ({
-    CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-    FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK), FAKT_AMT: r.FAKT_AMT
-  })));
+const [fkv_raw, kekv_raw, expenses_func, expenses_func_econ] = await Promise.all([
+  FileAttachment("data/classificators/FKV.json").json(),
+  FileAttachment("data/classificators/KEKV.json").json(),
+  FileAttachment("data/expenses-functional.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK), FAKT_AMT: r.FAKT_AMT
+    }))),
+  FileAttachment("data/expenses-functional-economic.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK),
+      FAKT_AMT: r.FAKT_AMT
+    })))
+]);
 ```
 
 ```js
@@ -30,7 +38,8 @@ function prepClassificator(raw, rootName) {
     ).values()).sort((a, b) => a.code - b.code)
   ];
 }
-const fkv_prep = prepClassificator(fkv_raw, "Загальні видатки (функціональні)");
+const fkv_prep  = prepClassificator(fkv_raw,  "Загальні видатки (функціональні)");
+const kekv_prep = prepClassificator(kekv_raw, "Загальні видатки");
 
 const data = (() => {
   const agg = {};
@@ -120,4 +129,92 @@ display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
 ```js
 const exp_diff = get_treetab_diff(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectCity, selectYear, baseYear, month_max);
 display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
+```
+
+---
+
+## Expense by economic class × functional category — ${selectCity} ${selectYear}
+
+```js
+// Build combined hierarchy: Economic L1 (outer) → FKV functional tree (inner)
+function buildCrossClassFlatData(expFuncEcon, kekPrep, fkvPrep, city, year, monthMax) {
+  const fkvByCode  = new Map(fkvPrep.filter(d => d.level > 0).map(d => [d.code, d]));
+  const kekByCode  = new Map(kekPrep.map(d => [d.code, d]));
+
+  function getKekL1(code) {
+    let n = kekByCode.get(code);
+    while (n && n.level > 1) n = kekByCode.get(n.parentCode);
+    return n && n.level === 1 ? n : null;
+  }
+
+  function getFkvPath(code) {
+    const node = fkvByCode.get(code);
+    if (!node) return null;
+    if (node.level === 1) return {l1: node, l2: null, leaf: node};
+    const par = fkvByCode.get(node.parentCode);
+    if (!par) return {l1: null, l2: null, leaf: node};
+    if (node.level === 2) return {l1: par, l2: null, leaf: node};
+    const gp = fkvByCode.get(par.parentCode);
+    return {l1: gp && gp.level > 0 ? gp : null, l2: par, leaf: node};
+  }
+
+  // Aggregate (ekL1Code, fkvLeafCode) → value
+  const leafAgg = {};
+  for (const d of expFuncEcon) {
+    if (d.CITY !== city || d.FUND_TYP !== "T") continue;
+    if (d.REP_PERIOD.getUTCFullYear() !== year) continue;
+    if (d.REP_PERIOD.getUTCMonth() !== monthMax) continue;
+    const ek = getKekL1(d.COD_CONS_EK);
+    if (!ek) continue;
+    const key = `${ek.code}__${d.COD_CONS_MB_FK}`;
+    leafAgg[key] = (leafAgg[key] || 0) + (d.FAKT_AMT || 0) / 1e6;
+  }
+
+  if (Object.keys(leafAgg).length === 0) return [];
+
+  const interNodes = new Map();
+  const leafNodes  = [];
+
+  interNodes.set("root", {code: "root", parentCode: null, level: 0, name: "Total expenses"});
+
+  for (const [key, val] of Object.entries(leafAgg)) {
+    if (!val || val <= 0) continue;
+    const [ekStr, fkvStr] = key.split("__");
+    const ekCode = +ekStr, fkvLeafCode = +fkvStr;
+    const ekNode  = kekByCode.get(ekCode);
+    const fkvPath = getFkvPath(fkvLeafCode);
+    if (!ekNode || !fkvPath) continue;
+
+    const ekId = `ek_${ekCode}`;
+    if (!interNodes.has(ekId))
+      interNodes.set(ekId, {code: ekId, parentCode: "root", level: 1, name: ekNode.name});
+
+    let leafParentId = ekId;
+
+    if (fkvPath.l1 && fkvPath.l1.code !== fkvLeafCode) {
+      const l1Id = `${ekCode}_${fkvPath.l1.code}`;
+      if (!interNodes.has(l1Id))
+        interNodes.set(l1Id, {code: l1Id, parentCode: ekId, level: 2, name: fkvPath.l1.name});
+      leafParentId = l1Id;
+
+      if (fkvPath.l2 && fkvPath.l2.code !== fkvLeafCode) {
+        const l2Id = `${ekCode}_${fkvPath.l2.code}`;
+        if (!interNodes.has(l2Id))
+          interNodes.set(l2Id, {code: l2Id, parentCode: l1Id, level: 3, name: fkvPath.l2.name});
+        leafParentId = l2Id;
+      }
+    }
+
+    const leafId = `${ekCode}__leaf__${fkvLeafCode}`;
+    leafNodes.push({code: leafId, parentCode: leafParentId, level: fkvPath.leaf.level + 1, name: fkvPath.leaf.name, value: val});
+  }
+
+  return [...interNodes.values(), ...leafNodes];
+}
+
+const cross_trtab = buildCrossClassFlatData(expenses_func_econ, kekv_prep, fkv_prep, selectCity, selectYear, month_max);
+display(cross_trtab.length > 0
+  ? Icicle(cross_trtab, {label: d => d.name, width: 1152, height: 500})
+  : html`<p style="color:gray">No cross-classification data available for ${selectCity} ${selectYear}.</p>`
+);
 ```

@@ -28,7 +28,7 @@ model_income_categories:
   - {name: "Transfers",                         breakEnd: 41999999, parent: "Transfers"}
   - {name: "Capital grants",                    breakEnd: 42999999, parent: "Other capital revenues", grandparent: "Capital revenues"}
   - {name: "Transfers",                         breakEnd: 49999999, parent: "Transfers"}
-  - {name: "Target funds",                      breakEnd: 59999999, parent: "Other capital revenues", grandparent: "Capital revenues"}  # Цільові фонди (codes 50000000+)
+  - {name: "Other non-tax revenues",            breakEnd: 59999999, parent: "Non-tax revenues"}  # Цільові фонди (codes 50000000+)
 
 model_expense_categories:
   - {name: "Staff Costs",                       breakEnd: 2199,  parent: "Operating expenditures"}
@@ -92,6 +92,9 @@ summary_row_order:
   - "Deposit operations"
   - "Cash, bop"
   - "Cash, eop"
+  - "Reverse subsidy"
+
+reverse_subsidy_fkv_code: 180
 
 # Chart color schemes
 colors:

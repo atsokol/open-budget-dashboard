@@ -231,150 +231,117 @@ export function addWaterfallSheet(wb, wfData, sheetName) {
   }
 }
 
-// Add Summary Financials sheet with 4-table layout:
-//   Top-left  (Table 1): annual (FY) values for historical years + optional Budget column
-//   Top-right (Table 3): YoY diffs between consecutive Table 1 columns
-//   Bottom-left  (Table 2): period (Nm) cumulative values for all years
-//   Bottom-right (Table 4): YoY diffs between consecutive Table 2 columns
-// Tables 3 & 4 diff columns use red-white-green color scale (same as Current surplus diff sheet).
-// annualRows / periodRows: [{TYPE, CAT, actuals:{key:val}, budget}]
-// annualCols  / periodCols: [{year, month, key, label}]
-export function addSummaryFinancialsSheet(wb, annualRows, periodRows, annualCols, periodCols, {hasBudget = false, yearTo = ""} = {}) {
-  const ws = wb.addWorksheet("Summary Financials");
+// Add a Summary Financials sheet with combined column set and explicit diff specs.
+// Left side: value columns (all cols); right side (after GAP spacer): diff columns per diffSpecs.
+// rows: [{TYPE, CAT, actuals:{key:val}}]
+// cols: [{year, month, key, label}] — combined (FY + period + budget), budget cols have isBudget:true
+// diffSpecs: [{fromKey, toKey, label}] — explicit diff pairs; length may differ from cols.length-1
+export function addSummaryFinancialsSheet(wb, rows, cols, sheetName, diffSpecs = []) {
+  const ws = wb.addWorksheet(sheetName);
   const LABEL_COLS = 2; // Category, Type
-  const GAP = 3;        // three empty columns between value and diff sections
+  const GAP = 3;        // empty columns between value and diff sections
 
-  const nAnn   = annualCols.length + (hasBudget ? 1 : 0);
-  const nDiff1 = nAnn - 1;
-  const nPer   = periodCols.length;
-  const nDiff2 = nPer - 1;
+  // cols and diffSpecs may contain {separator:true} entries for visual section gaps.
+  const nVal  = cols.length;
+  const nDiff = diffSpecs.length;
 
-  // Column positions (1-based):
-  //   1-2          : Category, Type
-  //   t1Start ..   : value columns (Table 1 / Table 2)
-  //   +GAP cols    : empty spacer
-  //   typeRepeatCol: repeated Type column
-  //   t3Start ..   : diff columns (Table 3 / Table 4)
   const t1Start       = LABEL_COLS + 1;
-  const typeRepeatCol = t1Start + nAnn + GAP;
+  const typeRepeatCol = t1Start + nVal + GAP;
   const t3Start       = typeRepeatCol + 1;
 
   ws.getColumn(1).width = 20;
   ws.getColumn(2).width = 35;
-  for (let i = t1Start; i < t1Start + nAnn; i++) ws.getColumn(i).width = 16;
-  for (let i = t1Start + nAnn; i < typeRepeatCol; i++) ws.getColumn(i).width = 3;
+  cols.forEach((c, i) => { ws.getColumn(t1Start + i).width = c && !c.separator ? 16 : 4; });
+  for (let i = t1Start + nVal; i < typeRepeatCol; i++) ws.getColumn(i).width = 3;
   ws.getColumn(typeRepeatCol).width = 35;
-  for (let i = t3Start; i < t3Start + Math.max(nDiff1, nDiff2); i++) ws.getColumn(i).width = 18;
+  diffSpecs.forEach((s, i) => { ws.getColumn(t3Start + i).width = s && !s.separator ? 18 : 4; });
 
-  const HIGHLIGHT       = new Set(["Current surplus", "Net surplus"]);
-  const IDENTITY_TYPES  = ["Cash, eop", "Cash, bop", "Net surplus", "Interbudget loans", "Deposit operations"];
+  const HIGHLIGHT      = new Set(["Current surplus", "Net surplus"]);
+  const IDENTITY_TYPES = ["Cash, eop", "Cash, bop", "Net surplus", "Interbudget loans", "Deposit operations"];
 
-  function writeHeaderRow(rowNum, valLabels, diffLabels) {
-    const hRow = ws.getRow(rowNum);
-    hRow.font = {bold: true, size: 11};
-    hRow.getCell(1).value = "Category"; hRow.getCell(1).alignment = ALIGN_MID; hRow.getCell(1).fill = HEADER_FILL;
-    hRow.getCell(2).value = "Type";     hRow.getCell(2).alignment = ALIGN_MID; hRow.getCell(2).fill = HEADER_FILL;
-    valLabels.forEach((lbl, i) => {
-      const cell = hRow.getCell(t1Start + i);
-      cell.value = lbl; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+  const hRow = ws.getRow(1);
+  hRow.font = {bold: true, size: 11};
+  hRow.getCell(1).value = "Category"; hRow.getCell(1).alignment = ALIGN_MID; hRow.getCell(1).fill = HEADER_FILL;
+  hRow.getCell(2).value = "Type";     hRow.getCell(2).alignment = ALIGN_MID; hRow.getCell(2).fill = HEADER_FILL;
+  cols.forEach((c, i) => {
+    if (!c || c.separator) return;
+    const cell = hRow.getCell(t1Start + i);
+    cell.value = c.label; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+  });
+  hRow.getCell(typeRepeatCol).value = "Type"; hRow.getCell(typeRepeatCol).alignment = ALIGN_MID; hRow.getCell(typeRepeatCol).fill = HEADER_FILL;
+  diffSpecs.forEach((spec, i) => {
+    if (!spec || spec.separator) return;
+    const cell = hRow.getCell(t3Start + i);
+    cell.value = spec.label; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+  });
+
+  let rowNum = 2;
+  const typeRowMap = {};
+  for (const r of rows) {
+    const row = ws.getRow(rowNum);
+    row.getCell(1).value = r.CAT;
+    row.getCell(2).value = r.TYPE;
+    const valsMap = {};
+    for (const c of cols) { if (c && !c.separator) valsMap[c.key] = r.actuals[c.key] || 0; }
+    cols.forEach((c, i) => {
+      if (!c || c.separator) return;
+      const cell = row.getCell(t1Start + i);
+      cell.value = valsMap[c.key]; cell.numFmt = '#,##0';
     });
-    hRow.getCell(typeRepeatCol).value = "Type"; hRow.getCell(typeRepeatCol).alignment = ALIGN_MID; hRow.getCell(typeRepeatCol).fill = HEADER_FILL;
-    diffLabels.forEach((lbl, i) => {
-      const cell = hRow.getCell(t3Start + i);
-      cell.value = lbl; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+    row.getCell(typeRepeatCol).value = r.TYPE;
+    diffSpecs.forEach((spec, d) => {
+      if (!spec || spec.separator) return;
+      const cell = row.getCell(t3Start + d);
+      cell.value = (valsMap[spec.toKey] || 0) - (valsMap[spec.fromKey] || 0);
+      cell.numFmt = '#,##0';
     });
-  }
-
-  function writeDataRows(fsRows, cols, hasBgt, startRow, diffCount) {
-    let rowNum = startRow;
-    const typeRowMap = {};
-    for (const r of fsRows) {
-      const row = ws.getRow(rowNum);
-      row.getCell(1).value = r.CAT;
-      row.getCell(2).value = r.TYPE;
-      const vals = cols.map(c => r.actuals[c.key] || 0);
-      if (hasBgt) vals.push(r.budget || 0);
-      vals.forEach((v, i) => {
-        const cell = row.getCell(t1Start + i);
-        cell.value = v; cell.numFmt = '#,##0';
-      });
-      row.getCell(typeRepeatCol).value = r.TYPE;
-      for (let d = 0; d < diffCount; d++) {
-        const cell = row.getCell(t3Start + d);
-        cell.value = vals[d + 1] - vals[d];
-        cell.numFmt = '#,##0';
-      }
-      row.font = r.CAT === "Total" ? {bold: true, size: 11} : {size: 10};
-      if (HIGHLIGHT.has(r.TYPE)) {
-        const lastFill = diffCount > 0 ? t3Start + diffCount - 1 : typeRepeatCol;
-        for (let c = 1; c <= lastFill; c++) {
-          row.getCell(c).fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFFFFDE7'}};
-        }
-      }
-      typeRowMap[r.TYPE] = rowNum;
-      rowNum++;
-    }
-    return {nextRow: rowNum, typeRowMap};
-  }
-
-  // Writes a blank separator then a Check row using Excel ABS formulas.
-  // blankRow: the row to leave empty; check is written at blankRow+1.
-  // Returns the row after the check row.
-  function writeCheckRow(blankRow, typeRowMap, numValueCols) {
-    const checkRowNum = blankRow + 1;
-    const checkRow = ws.getRow(checkRowNum);
-    checkRow.getCell(2).value = "Check";
-    checkRow.getCell(typeRepeatCol).value = "Check";
-    const labelFont = {italic: true, size: 10};
-    checkRow.getCell(2).font = labelFont;
-    checkRow.getCell(typeRepeatCol).font = labelFont;
-    const typeRows = IDENTITY_TYPES.map(t => typeRowMap[t]);
-    if (!typeRows.some(r => r == null)) {
-      for (let ci = 0; ci < numValueCols; ci++) {
-        const colIdx = t1Start + ci;
-        const col = colLetter(colIdx);
-        const formula = `ABS(${col}${typeRows[0]}-${col}${typeRows[1]}-${col}${typeRows[2]}-${col}${typeRows[3]}-${col}${typeRows[4]})<0.5`;
-        const cell = checkRow.getCell(colIdx);
-        cell.value = {formula};
-        cell.font = labelFont;
+    row.font = r.CAT === "Total" ? {bold: true, size: 11} : {size: 10};
+    if (HIGHLIGHT.has(r.TYPE)) {
+      const lastFill = nDiff > 0 ? t3Start + nDiff - 1 : typeRepeatCol;
+      for (let c = 1; c <= lastFill; c++) {
+        row.getCell(c).fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFFFFDE7'}};
       }
     }
-    return checkRowNum + 1;
+    typeRowMap[r.TYPE] = rowNum;
+    rowNum++;
   }
+  const afterData = rowNum;
 
-  function applyColorScale(startRow, endRow, diffCount) {
-    for (let d = 0; d < diffCount; d++) {
+  if (rows.length > 0 && nDiff > 0) {
+    diffSpecs.forEach((spec, d) => {
+      if (!spec || spec.separator) return;
       const col = colLetter(t3Start + d);
       ws.addConditionalFormatting({
-        ref: `${col}${startRow}:${col}${endRow}`,
+        ref: `${col}2:${col}${afterData - 1}`,
         rules: [{
           type: "colorScale",
           cfvo: [{type: "min"}, {type: "num", value: 0}, {type: "max"}],
           color: [{argb: "FFF8696B"}, {argb: "FFFFFFFF"}, {argb: "FF63BE7B"}]
         }]
       });
-    }
+    });
   }
 
-  // ── Table 1 & 3: Annual ──
-  const annLabels  = [...annualCols.map(c => c.label), ...(hasBudget ? [`Budget ${yearTo}`] : [])];
-  const diff1Labels = annLabels.slice(1).map((lbl, i) => `Δ ${lbl} vs ${annLabels[i]}`);
-  writeHeaderRow(1, annLabels, diff1Labels);
-  const t1DataStart = 2;
-  const {nextRow: afterAnn, typeRowMap: typeRowMap1} = writeDataRows(annualRows, annualCols, hasBudget, t1DataStart, nDiff1);
-  if (annualRows.length > 0 && nDiff1 > 0) applyColorScale(t1DataStart, afterAnn - 1, nDiff1);
-  // Check row (blank at afterAnn, check at afterAnn+1), then 3 blank rows before Table 2
-  const afterCheck1 = writeCheckRow(afterAnn, typeRowMap1, nAnn);
-
-  // ── Table 2 & 4: Period ──
-  const t2HeaderRow = afterCheck1 + 3; // 3 blank rows gap
-  const perLabels   = periodCols.map(c => c.label);
-  const diff2Labels = perLabels.slice(1).map((lbl, i) => `Δ ${lbl} vs ${perLabels[i]}`);
-  writeHeaderRow(t2HeaderRow, perLabels, diff2Labels);
-  const t2DataStart = t2HeaderRow + 1;
-  const {nextRow: afterPer, typeRowMap: typeRowMap2} = writeDataRows(periodRows, periodCols, false, t2DataStart, nDiff2);
-  if (periodRows.length > 0 && nDiff2 > 0) applyColorScale(t2DataStart, afterPer - 1, nDiff2);
-  writeCheckRow(afterPer, typeRowMap2, nPer);
+  // Check row
+  const checkRow = ws.getRow(afterData + 1);
+  checkRow.getCell(2).value = "Check";
+  checkRow.getCell(typeRepeatCol).value = "Check";
+  const labelFont = {italic: true, size: 10};
+  checkRow.getCell(2).font = labelFont;
+  checkRow.getCell(typeRepeatCol).font = labelFont;
+  const IDENTITY_TYPES_ROWS = IDENTITY_TYPES.map(t => typeRowMap[t]);
+  if (!IDENTITY_TYPES_ROWS.some(r => r == null)) {
+    cols.forEach((c, ci) => {
+      if (!c || c.separator) return;
+      const colIdx = t1Start + ci;
+      const col = colLetter(colIdx);
+      const [r0, r1, r2, r3, r4] = IDENTITY_TYPES_ROWS;
+      const formula = `ABS(${col}${r0}-${col}${r1}-${col}${r2}-${col}${r3}-${col}${r4})<0.5`;
+      const cell = checkRow.getCell(colIdx);
+      cell.value = {formula};
+      cell.font = labelFont;
+    });
+  }
 }
 
 // Write workbook to buffer and trigger browser download
@@ -475,92 +442,208 @@ export function addCurrentSurplusDiffSheet(wb, rows, sheetName, {currentYear, ba
   }
 }
 
-// Add Financial Summary Breakdown sheet — two vertically stacked tables (annual + period),
-// mirroring the layout of Summary Financials.
-// Each table has 3-level grouped rows:
-//   Level 1: financial summary TYPE; isTotal rows have yellow fill + same font as level-1
-//   Level 2: Sub-type column — intermediate groupings (model categories, no code)
-//   Level 2 leaf / Level 3: Item column — official Ukrainian classificator names
-// annualRows/periodRows: [{level, name, cat, code, isTotal, actuals:{colKey:val}, budget}]
-// annualCols/periodCols: [{key, label}]
-export function addSummaryBreakdownSheet(wb, annualRows, periodRows, annualCols, periodCols, sheetName, {hasBudget = false, yearTo = ""} = {}) {
+// Add a Financial Summary Breakdown sheet with combined column set and explicit diff specs.
+// Main table: 5 label cols + value cols. Diff table to the right (after GAP spacer):
+//   repeated Item label + diff columns per diffSpecs.
+// rows: [{level, name, cat, code, isTotal, actuals:{colKey:val}}]
+// cols: [{key, label}] — combined (FY + period + budget), budget cols have isBudget:true
+// diffSpecs: [{fromKey, toKey, label}] — explicit diff pairs
+export function addSummaryBreakdownSheet(wb, rows, cols, sheetName, diffSpecs = []) {
   const ws = wb.addWorksheet(sheetName);
   ws.properties.outlineLevelRow = 0;
   ws.properties.outlineProperties = {summaryBelow: false};
 
+  // cols and diffSpecs may contain {separator:true} entries for visual section gaps.
   const LABEL_COLS = 5; // Category | Type | Sub-type | Item | Code
-  const nMax = Math.max(annualCols.length + (hasBudget ? 1 : 0), periodCols.length);
+  const GAP = 3;
+  const nVal  = cols.length;
+  const nDiff = diffSpecs.length;
+
+  // Column positions (1-based)
+  const valStart   = LABEL_COLS + 1;
+  const nameRepCol = valStart + nVal + GAP;
+  const diffStart  = nameRepCol + 1;
+
   ws.getColumn(1).width = 16;
   ws.getColumn(2).width = 28;
   ws.getColumn(3).width = 35;
   ws.getColumn(4).width = 45;
   ws.getColumn(5).width = 14;
-  for (let i = LABEL_COLS + 1; i <= LABEL_COLS + nMax; i++) ws.getColumn(i).width = 16;
+  cols.forEach((c, i) => { ws.getColumn(valStart + i).width = c && !c.separator ? 16 : 4; });
+  for (let i = valStart + nVal; i < nameRepCol; i++) ws.getColumn(i).width = 3;
+  ws.getColumn(nameRepCol).width = 45;
+  diffSpecs.forEach((s, i) => { ws.getColumn(diffStart + i).width = s && !s.separator ? 18 : 4; });
 
   const yellowFill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFFFFDE7'}};
 
-  function writeHeader(rowNum, valueCols, showBudget) {
-    const h = ws.getRow(rowNum);
-    h.font = {bold: true, size: 11};
-    const labelCells = [
-      {col: 1, val: "Category"}, {col: 2, val: "Type"},
-      {col: 3, val: "Sub-type"}, {col: 4, val: "Item"}, {col: 5, val: "Code"}
-    ];
-    labelCells.forEach(({col, val}) => {
-      const cell = h.getCell(col);
-      cell.value = val;
-      cell.alignment = ALIGN_MID;
-      cell.fill = HEADER_FILL;
+  // Header row
+  const h = ws.getRow(1);
+  h.font = {bold: true, size: 11};
+  [{col: 1, val: "Category"}, {col: 2, val: "Type"}, {col: 3, val: "Sub-type"}, {col: 4, val: "Item"}, {col: 5, val: "Code"}].forEach(({col, val}) => {
+    const cell = h.getCell(col);
+    cell.value = val; cell.alignment = ALIGN_MID; cell.fill = HEADER_FILL;
+  });
+  cols.forEach((c, i) => {
+    if (!c || c.separator) return;
+    const cell = h.getCell(valStart + i);
+    cell.value = c.label; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+  });
+  const nameRepHeader = h.getCell(nameRepCol);
+  nameRepHeader.value = "Item"; nameRepHeader.alignment = ALIGN_MID; nameRepHeader.fill = HEADER_FILL;
+  diffSpecs.forEach((spec, i) => {
+    if (!spec || spec.separator) return;
+    const cell = h.getCell(diffStart + i);
+    cell.value = spec.label; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+  });
+
+  // Data rows
+  let rn = 2;
+  for (const r of rows) {
+    const row = ws.getRow(rn++);
+    // Main label columns
+    row.getCell(1).value = r.level === 1 ? (r.cat || "") : "";
+    row.getCell(2).value = r.level === 1 ? r.name : "";
+    row.getCell(3).value = r.level === 2 && r.code == null ? r.name : "";
+    row.getCell(4).value = r.level === 3 || (r.level === 2 && r.code != null) ? r.name : "";
+    row.getCell(5).value = r.code != null ? r.code : "";
+    // Value columns
+    const valsMap = {};
+    for (const c of cols) { if (c && !c.separator) valsMap[c.key] = r.actuals[c.key] || 0; }
+    cols.forEach((c, i) => {
+      if (!c || c.separator) return;
+      const cell = row.getCell(valStart + i);
+      cell.value = valsMap[c.key]; cell.numFmt = "#,##0";
     });
-    valueCols.forEach((c, i) => {
-      const cell = h.getCell(LABEL_COLS + 1 + i);
-      cell.value = c.label;
-      cell.alignment = ALIGN_RIGHT;
-      cell.fill = HEADER_FILL;
+    // Diff table: repeated name + diffs
+    row.getCell(nameRepCol).value = r.name;
+    diffSpecs.forEach((spec, d) => {
+      if (!spec || spec.separator) return;
+      const cell = row.getCell(diffStart + d);
+      cell.value = (valsMap[spec.toKey] || 0) - (valsMap[spec.fromKey] || 0);
+      cell.numFmt = "#,##0";
     });
-    if (showBudget) {
-      const cell = h.getCell(LABEL_COLS + valueCols.length + 1);
-      cell.value = `Budget ${yearTo}`;
-      cell.alignment = ALIGN_RIGHT;
-      cell.fill = HEADER_FILL;
+    row.outlineLevel = r.isTotal ? 0 : Math.max(0, r.level - 1);
+    row.font = fontForLevel(r.level);
+    if (r.isTotal) {
+      for (let c = 1; c <= LABEL_COLS + nVal; c++) row.getCell(c).fill = yellowFill;
+      row.getCell(nameRepCol).fill = yellowFill;
+      for (let c = diffStart; c < diffStart + nDiff; c++) row.getCell(c).fill = yellowFill;
     }
   }
 
-  function writeDataRows(startRow, rows, valueCols, showBudget) {
-    const numValCols = valueCols.length + (showBudget ? 1 : 0);
-    let rn = startRow;
-    for (const r of rows) {
-      const row = ws.getRow(rn++);
-      row.getCell(1).value = r.level === 1 ? (r.cat || "") : "";
-      row.getCell(2).value = r.level === 1 ? r.name : "";
-      row.getCell(3).value = r.level === 2 && r.code == null ? r.name : "";
-      row.getCell(4).value = r.level === 3 || (r.level === 2 && r.code != null) ? r.name : "";
-      row.getCell(5).value = r.code != null ? r.code : "";
-      valueCols.forEach((c, i) => {
-        const cell = row.getCell(LABEL_COLS + 1 + i);
-        cell.value = r.actuals[c.key] || 0; cell.numFmt = "#,##0";
+  // Color scale on diff columns (skip separators)
+  if (rows.length > 0 && nDiff > 0) {
+    diffSpecs.forEach((spec, d) => {
+      if (!spec || spec.separator) return;
+      const col = colLetter(diffStart + d);
+      ws.addConditionalFormatting({
+        ref: `${col}2:${col}${rn - 1}`,
+        rules: [{
+          type: "colorScale",
+          cfvo: [{type: "min"}, {type: "num", value: 0}, {type: "max"}],
+          color: [{argb: "FFF8696B"}, {argb: "FFFFFFFF"}, {argb: "FF63BE7B"}]
+        }]
       });
-      if (showBudget) {
-        const cell = row.getCell(LABEL_COLS + valueCols.length + 1);
-        cell.value = r.budget || 0; cell.numFmt = "#,##0";
-      }
-      row.outlineLevel = r.isTotal ? 0 : Math.max(0, r.level - 1);
-      row.font = fontForLevel(r.level);
-      if (r.isTotal) {
-        for (let c = 1; c <= LABEL_COLS + numValCols; c++) row.getCell(c).fill = yellowFill;
-      }
-    }
-    return rn;
+    });
+  }
+}
+
+// Add an Expense Cross-Classification sheet (Economic L1 × Functional hierarchy).
+// Mirrors addSummaryBreakdownSheet structure but with a 4-level depth:
+//   Level 1: Economic L1 (Current / Capital / Other / Undistributed)
+//   Level 2: FKV section (code=null → col 2; code≠null → col 4 as leaf)
+//   Level 3: FKV sub-section (code=null → col 3; code≠null → col 4 as leaf)
+//   Level 4: FKV detail leaf → col 4, Code → col 5
+// rows: [{level (1-4), name, cat, code, isTotal, actuals:{colKey:val}}]
+// cols: combined layout cols (may include {separator:true} entries)
+// diffSpecs: explicit diff pairs (may include {separator:true} entries)
+export function addExpCrossClassSheet(wb, rows, cols, sheetName, diffSpecs = []) {
+  const ws = wb.addWorksheet(sheetName);
+  ws.properties.outlineLevelRow = 0;
+  ws.properties.outlineProperties = {summaryBelow: false};
+
+  const LABEL_COLS = 5;
+  const GAP = 3;
+  const nVal  = cols.length;
+  const nDiff = diffSpecs.length;
+
+  const valStart   = LABEL_COLS + 1;
+  const nameRepCol = valStart + nVal + GAP;
+  const diffStart  = nameRepCol + 1;
+
+  ws.getColumn(1).width = 20;
+  ws.getColumn(2).width = 35;
+  ws.getColumn(3).width = 45;
+  ws.getColumn(4).width = 45;
+  ws.getColumn(5).width = 14;
+  cols.forEach((c, i) => { ws.getColumn(valStart + i).width = c && !c.separator ? 16 : 4; });
+  for (let i = valStart + nVal; i < nameRepCol; i++) ws.getColumn(i).width = 3;
+  ws.getColumn(nameRepCol).width = 45;
+  diffSpecs.forEach((s, i) => { ws.getColumn(diffStart + i).width = s && !s.separator ? 18 : 4; });
+
+  // Header row
+  const h = ws.getRow(1);
+  h.font = {bold: true, size: 11};
+  [{col: 1, val: "Economic class"}, {col: 2, val: "FKV section"}, {col: 3, val: "FKV sub-section"}, {col: 4, val: "FKV detail"}, {col: 5, val: "Code"}].forEach(({col, val}) => {
+    const cell = h.getCell(col);
+    cell.value = val; cell.alignment = ALIGN_MID; cell.fill = HEADER_FILL;
+  });
+  cols.forEach((c, i) => {
+    if (!c || c.separator) return;
+    const cell = h.getCell(valStart + i);
+    cell.value = c.label; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+  });
+  const nameRepHeader = h.getCell(nameRepCol);
+  nameRepHeader.value = "Item"; nameRepHeader.alignment = ALIGN_MID; nameRepHeader.fill = HEADER_FILL;
+  diffSpecs.forEach((spec, i) => {
+    if (!spec || spec.separator) return;
+    const cell = h.getCell(diffStart + i);
+    cell.value = spec.label; cell.alignment = ALIGN_RIGHT; cell.fill = HEADER_FILL;
+  });
+
+  // Data rows
+  let rn = 2;
+  for (const r of rows) {
+    const row = ws.getRow(rn++);
+    row.getCell(1).value = r.level === 1 ? r.name : "";
+    row.getCell(2).value = r.level === 2 && r.code == null ? r.name : "";
+    row.getCell(3).value = r.level === 3 && r.code == null ? r.name : "";
+    row.getCell(4).value = r.level === 4 || (r.level >= 2 && r.code != null) ? r.name : "";
+    row.getCell(5).value = r.code != null ? r.code : "";
+
+    const valsMap = {};
+    for (const c of cols) { if (c && !c.separator) valsMap[c.key] = r.actuals[c.key] || 0; }
+    cols.forEach((c, i) => {
+      if (!c || c.separator) return;
+      const cell = row.getCell(valStart + i);
+      cell.value = valsMap[c.key]; cell.numFmt = "#,##0";
+    });
+    row.getCell(nameRepCol).value = r.name;
+    diffSpecs.forEach((spec, d) => {
+      if (!spec || spec.separator) return;
+      const cell = row.getCell(diffStart + d);
+      cell.value = (valsMap[spec.toKey] || 0) - (valsMap[spec.fromKey] || 0);
+      cell.numFmt = "#,##0";
+    });
+    row.outlineLevel = Math.max(0, r.level - 1);
+    row.font = fontForLevel(r.level);
   }
 
-  // Table 1: Annual (FY)
-  writeHeader(1, annualCols, hasBudget);
-  const afterAnn = writeDataRows(2, annualRows, annualCols, hasBudget);
-
-  // Table 2: Period (Nm) — 3 blank rows gap, no budget column
-  const perHeader = afterAnn + 3;
-  writeHeader(perHeader, periodCols, false);
-  writeDataRows(perHeader + 1, periodRows, periodCols, false);
+  // Color scale on diff columns
+  if (rows.length > 0 && nDiff > 0) {
+    diffSpecs.forEach((spec, d) => {
+      if (!spec || spec.separator) return;
+      const col = colLetter(diffStart + d);
+      ws.addConditionalFormatting({
+        ref: `${col}2:${col}${rn - 1}`,
+        rules: [{
+          type: "colorScale",
+          cfvo: [{type: "min"}, {type: "num", value: 0}, {type: "max"}],
+          color: [{argb: "FFF8696B"}, {argb: "FFFFFFFF"}, {argb: "FF63BE7B"}]
+        }]
+      });
+    });
+  }
 }
 
 // ── Standalone single-sheet export functions (used on individual pages) ────
