@@ -38,7 +38,7 @@ const [inck_raw, kek_raw, fkv_raw, incomes, expenses_econ, expenses_func, revers
   FileAttachment("data/reverse-subsidy.arrow").arrow()
     .then(t => [...t].map(r => ({
       CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK),
+      FUND_TYP: r.FUND_TYP, COD_CONS_MB_PK: Number(r.COD_CONS_MB_PK), COD_CONS_MB_PK_NAME: r.COD_CONS_MB_PK_NAME,
       ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
     }))),
   FileAttachment("data/debts.arrow").arrow()
@@ -884,12 +884,12 @@ function buildSummaryBreakdownRows(incData, expData, debtsData, creditsData, cit
     return { actuals: totals, budget: bud };
   }
 
-  // Reverse subsidy breakdown by KEKV economic code
+  // Reverse subsidy breakdown by program code (COD_CONS_MB_PK)
   const revSubBreak = {};
   for (const d of (expFuncEconData || []).filter(d => d.CITY === city && d.FUND_TYP === "T")) {
-    const code = d.COD_CONS_EK;
+    const code = d.COD_CONS_MB_PK;
     const yr = d.REP_PERIOD.getUTCFullYear(), mo = d.REP_PERIOD.getUTCMonth() + 1;
-    if (!revSubBreak[code]) revSubBreak[code] = { name: kekNameByCode.get(code) || `Code ${code}`, actuals: zeroActuals(), budget: 0 };
+    if (!revSubBreak[code]) revSubBreak[code] = { name: d.COD_CONS_MB_PK_NAME || `Code ${code}`, actuals: zeroActuals(), budget: 0 };
     const e = revSubBreak[code];
     for (const col of cols) {
       if (yr === col.year && mo === col.month) e.actuals[col.key] -= (col.isBudget ? (d.ZAT_AMT || 0) : (d.FAKT_AMT || 0)) / 1e6;
