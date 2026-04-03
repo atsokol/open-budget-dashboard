@@ -3,11 +3,9 @@
 
 # ── Financial Model categories ──
 # Single hierarchical source of truth. Each entry carries:
-#   name     — model-level (detailed) category name
+#   name     — detailed category name
 #   breakEnd — upper code boundary for the ordered range scan (equivalent to R cut())
 #   parent   — summary-level category (derived summary lists are computed from these)
-# NOTE: Non-tax and Capital revenues are interleaved in code space — the global ordering
-#       of breakEnd values must be preserved; hierarchy is expressed via parent, not nesting.
 model_income_categories:
   - {name: "Personal income tax",               breakEnd: 11019999, parent: "Tax revenues"}
   - {name: "Other tax revenues",                breakEnd: 13999999, parent: "Tax revenues"}
@@ -16,17 +14,17 @@ model_income_categories:
   - {name: "Unified income tax",                breakEnd: 18059999, parent: "Tax revenues"}
   - {name: "Other tax revenues",                breakEnd: 19999999, parent: "Tax revenues"}
   - {name: "Other non-tax revenues",            breakEnd: 21010499, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 21010599, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 21010599, parent: "Capital revenues"}  
   - {name: "Other non-tax revenues",            breakEnd: 21010699, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 21011199, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 21011199, parent: "Capital revenues"} 
   - {name: "Other non-tax revenues",            breakEnd: 21049999, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 21050001, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 21050001, parent: "Capital revenues"} 
   - {name: "Other non-tax revenues",            breakEnd: 24109999, parent: "Non-tax revenues"}
-  - {name: "Interest received",                 breakEnd: 24119999, parent: "Interest received",      grandparent: "Capital revenues"}  # capital interest
+  - {name: "Interest received",                 breakEnd: 24119999, parent: "Capital revenues"}  
   - {name: "Other non-tax revenues",            breakEnd: 29999999, parent: "Non-tax revenues"}
-  - {name: "Sale of assets",                    breakEnd: 39999999, parent: "Sale of assets",         grandparent: "Capital revenues"}
+  - {name: "Sale of assets",                    breakEnd: 39999999, parent: "Capital revenues"}
   - {name: "Transfers",                         breakEnd: 41999999, parent: "Transfers"}
-  - {name: "Capital grants",                    breakEnd: 42999999, parent: "Other capital revenues", grandparent: "Capital revenues"}
+  - {name: "Capital grants",                    breakEnd: 42999999, parent: "Capital revenues"}
   - {name: "Transfers",                         breakEnd: 49999999, parent: "Transfers"}
   - {name: "Other non-tax revenues",            breakEnd: 59999999, parent: "Non-tax revenues"}  # Цільові фонди (codes 50000000+)
 
@@ -63,7 +61,6 @@ summary_totals:
   - {name: "Current revenues",            components: ["Tax revenues", "Non-tax revenues", "Transfers"]}
   - {name: "Operating surplus",           components: ["Current revenues", "Operating expenditures"]}
   - {name: "Current surplus",             components: ["Operating surplus", "Interest paid"]}
-  - {name: "Capital revenues",             components: ["Interest received", "Sale of assets", "Other capital revenues"]}
   - {name: "Capital surplus",             components: ["Capital revenues", "Capital expenditures"]}
   - {name: "Net surplus before financing", components: ["Capital surplus", "Current surplus"]}
   - {name: "Net debt",                    components: ["New Borrowings", "Debt Repayments"]}
@@ -78,9 +75,6 @@ summary_row_order:
   - "Operating surplus"
   - "Interest paid"
   - "Current surplus"
-  - "Interest received"
-  - "Sale of assets"
-  - "Other capital revenues"
   - "Capital revenues"
   - "Capital expenditures"
   - "Net surplus before financing"
@@ -94,7 +88,7 @@ summary_row_order:
   - "Cash, eop"
   - "Reverse subsidy"
 
-reverse_subsidy_fkv_code: 180
+reverse_subsidy_pk_code: 9110
 
 # Chart color schemes
 colors:

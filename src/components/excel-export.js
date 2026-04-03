@@ -185,7 +185,6 @@ export function appendIdentityCheckRow(ws, labelCols, typeRowMap, numDataCols, h
   ws.addRow([]); // blank separator
 
   const checkRow = ws.addRow([]);
-  const checkRowNum = checkRow.number;
   checkRow.getCell(labelCols).value = "Check";
   checkRow.getCell(labelCols).font = {italic: true, size: 10};
 
@@ -256,7 +255,6 @@ export function addSummaryFinancialsSheet(wb, rows, cols, sheetName, diffSpecs =
   ws.getColumn(typeRepeatCol).width = 35;
   diffSpecs.forEach((s, i) => { ws.getColumn(t3Start + i).width = s && !s.separator ? 18 : 4; });
 
-  const HIGHLIGHT      = new Set(["Current surplus", "Net surplus"]);
   const IDENTITY_TYPES = ["Cash, eop", "Cash, bop", "Net surplus", "Interbudget loans", "Deposit operations"];
 
   const hRow = ws.getRow(1);
@@ -296,7 +294,7 @@ export function addSummaryFinancialsSheet(wb, rows, cols, sheetName, diffSpecs =
       cell.numFmt = '#,##0';
     });
     row.font = r.CAT === "Total" ? {bold: true, size: 11} : {size: 10};
-    if (HIGHLIGHT.has(r.TYPE)) {
+    if (r.CAT === "Total") {
       const lastFill = nDiff > 0 ? t3Start + nDiff - 1 : typeRepeatCol;
       for (let c = 1; c <= lastFill; c++) {
         row.getCell(c).fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFFFFDE7'}};
@@ -646,32 +644,3 @@ export function addExpCrossClassSheet(wb, rows, cols, sheetName, diffSpecs = [])
   }
 }
 
-// ── Standalone single-sheet export functions (used on individual pages) ────
-
-// Export single-year icicle tree data to a grouped Excel file
-export async function treeToExcel(flatData, filename = "budget_data.xlsx", sheetName = "Data") {
-  const wb = createWorkbook();
-  addIcicleSheet(wb, flatData, sheetName);
-  await downloadWorkbook(wb, filename);
-}
-
-// Export diff icicle tree data to a grouped Excel file
-export async function treeDiffToExcel(flatData, filename = "budget_diff.xlsx", sheetName = "Comparison", {currentYear, baseYear} = {}) {
-  const wb = createWorkbook();
-  addIcicleDiffSheet(wb, flatData, sheetName, {currentYear, baseYear});
-  await downloadWorkbook(wb, filename);
-}
-
-// Returns a download button element for use in Observable pages
-export function ExcelButton(flatData, filename, sheetName, {isDiff = false, currentYear, baseYear, label = "📥 Download Excel"} = {}) {
-  const button = document.createElement("button");
-  button.textContent = label;
-  button.style.cssText = "padding: 6px 12px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #f8f8f8; font-size: 14px;";
-  button.onmouseenter = () => button.style.background = "#e8e8e8";
-  button.onmouseleave = () => button.style.background = "#f8f8f8";
-  button.onclick = () => {
-    if (isDiff) treeDiffToExcel(flatData, filename, sheetName, {currentYear, baseYear});
-    else treeToExcel(flatData, filename, sheetName);
-  };
-  return button;
-}

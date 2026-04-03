@@ -238,20 +238,6 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
   return arr;
 }
 
-// Helper function to get all descendant codes from a tree
-export function get_codes(c_table, base_codes) {
-  let tree = d3.stratify()
-    .id(d => d.code)
-    .parentId(d => d.parentCode)(c_table);
-  
-  let tree_codes = [];
-  for (let code of base_codes) {
-    let arr = tree.descendants().find(d => d.id == code).copy().descendants().map(d => d.data.code);
-    tree_codes = tree_codes.concat(arr);
-  }
-  return tree_codes;
-}
-
 // Helper function to get codes with exclusions
 export function get_codes_ex(c_table, base_codes, exclude_codes = []) {
   let tree = d3.stratify()

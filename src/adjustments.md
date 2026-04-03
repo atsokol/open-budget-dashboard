@@ -20,6 +20,7 @@ Inputs.button("Reset to Defaults", {
 
 ```js
 // Load config and classificators
+import {defaultCapitalIncomeCodes, defaultCapitalExpenseCodes, categorize} from "./components/capital-defaults.js";
 const cfg = await FileAttachment("data/config.json").json();
 const inck_table = await FileAttachment("data/classificators/KDB.json").json();
 const kek_table = await FileAttachment("data/classificators/KEKV.json").json();
@@ -53,12 +54,8 @@ const presentExpCodes = new Set(
 );
 
 // Default selections derived from config categories
-function categorize(code, cats) { for (const c of cats) if (code <= c.breakEnd) return c.name; return null; }
-const defaultCapIncCodes = [...new Set([
-  ...inck_prep.filter(d => d.level > 0).map(d => d.code),
-  ...[...presentIncCodes]
-].filter(code => categorize(code, cfg.summaryIncomeCategories) === "Capital revenues"))];
-const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryExpenseCategories) === "Capital expenditures").map(d => d.code);
+const defaultCapIncCodes = defaultCapitalIncomeCodes(inck_prep, presentIncCodes, cfg.summaryIncomeCategories);
+const defaultCapExpCodes = defaultCapitalExpenseCodes(kek_prep, cfg.summaryExpenseCategories);
 
 // Version key to invalidate cached localStorage when defaults change
 const CAPITAL_SETTINGS_VERSION = "v4";

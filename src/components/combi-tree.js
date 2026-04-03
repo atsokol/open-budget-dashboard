@@ -1,8 +1,7 @@
 // combi-tree.js
-// Defines the English-label hierarchy used for current surplus waterfall charts.
+// Defines the hierarchy used for current surplus waterfall charts.
 // Maps INC (KDB) income codes + KEKV economic expense codes into a unified tree
 // whose top-level nodes become the waterfall chart bars.
-// Ported from the Observable notebook's new_combi_tree definition.
 
 import * as d3 from "npm:d3";
 import { get_codes_ex, hierarchyToTable } from "./waterfall-data.js";

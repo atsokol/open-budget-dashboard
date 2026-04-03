@@ -13,7 +13,7 @@ import * as aq from "npm:arquero";
 import {buildCombiTable} from "./components/combi-tree.js";
 import {get_treetab_diff} from "./components/icicle.js";
 
-const [inck_raw, kek_raw, fkv_raw, incomes, expenses_econ, expenses_func, expenses_func_econ, debts, credits] = await Promise.all([
+const [inck_raw, kek_raw, fkv_raw, incomes, expenses_econ, expenses_func, reverse_subsidy, debts, credits] = await Promise.all([
   FileAttachment("data/classificators/KDB.json").json(),
   FileAttachment("data/classificators/KEKV.json").json(),
   FileAttachment("data/classificators/FKV.json").json(),
@@ -35,10 +35,10 @@ const [inck_raw, kek_raw, fkv_raw, incomes, expenses_econ, expenses_func, expens
       FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK),
       ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
     }))),
-  FileAttachment("data/expenses-functional-economic.arrow").arrow()
+  FileAttachment("data/reverse-subsidy.arrow").arrow()
     .then(t => [...t].map(r => ({
       CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK),
+      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK),
       ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
     }))),
   FileAttachment("data/debts.arrow").arrow()
@@ -77,7 +77,6 @@ const fkvNameByCode  = new Map(fkv_prep.map(d => [d.code, d.name]));
 // Category definitions loaded from config.yaml
 const cfg = await FileAttachment("data/config.json").json();
 const updateIncCat  = cfg.summaryIncomeCategories;
-const displayIncCat = cfg.displayIncomeCategories;
 const updateExpCat  = cfg.summaryExpenseCategories;
 const modelIncCat   = cfg.modelIncomeCategories;
 const modelExpCat  = cfg.modelExpenseCategories;
@@ -85,7 +84,6 @@ const financingCodeMap = Object.fromEntries(Object.entries(cfg.financingCodes).m
 const cashCodeMap      = Object.fromEntries(Object.entries(cfg.cashCodes).map(([k,v]) => [Number(k), v]));
 const summaryTotals          = cfg.summaryTotals;
 const summaryRowOrder        = cfg.summaryRowOrder;
-const reverseSubsidyFkvCode  = cfg.reverseSubsidyFkvCode;
 
 function categorize(code, cats) {
   for (const cat of cats) {
@@ -224,6 +222,7 @@ const hasBudget = budgetMonth >= 0;
 // When provided, the adjLabel override only fires if the display type (from catDefs) matches
 // the natural summary type — preventing named display sub-categories (e.g. "Interest received")
 // from being collapsed back into the adjLabel group.
+
 function aggByCut(data, codeField, catDefs, city, cols, adjCodes, adjLabel, naturalCats) {
   const filtered = data.filter(d => d.CITY === city && d.FUND_TYP === "T");
   const typeSums = new Map();
@@ -332,7 +331,7 @@ function aggCredits(creditsData, city, cols) {
 }
 
 function aggReverseSubsidy(expData, city, cols) {
-  const filtered = expData.filter(d => d.CITY === city && d.FUND_TYP === "T" && d.COD_CONS_MB_FK === reverseSubsidyFkvCode);
+  const filtered = expData.filter(d => d.CITY === city && d.FUND_TYP === "T");
   const sums = Object.fromEntries(cols.map(c => [c.key, 0]));
   let budgetVal = 0;
   for (const d of filtered) {
@@ -353,7 +352,7 @@ function aggReverseSubsidy(expData, city, cols) {
 }
 
 // ── Financial Summary (SUMMARY_UPDATE matching R) ──
-const incUpdate = aggByCut(incomes, "COD_INCO", displayIncCat, selectCity, columns, adjCatCodes, "Other capital revenues", updateIncCat);
+const incUpdate = aggByCut(incomes, "COD_INCO", updateIncCat, selectCity, columns, adjCatCodes, "Capital revenues", updateIncCat);
 incUpdate.forEach(r => r.CAT = "Income");
 
 const expUpdateRaw = aggByCut(expenses_econ, "COD_CONS_EK", updateExpCat, selectCity, columns, capExpSet, "Capital expenditures");
@@ -366,7 +365,7 @@ const expUpdate = expUpdateRaw.map(r => ({
 const finRows = aggFinancing(debts, selectCity, columns);
 const credRows = aggCredits(credits, selectCity, columns);
 const cashRows = aggCash(debts, selectCity, columns);
-const reverseSubsidyRows = aggReverseSubsidy(expenses_func, selectCity, columns);
+const reverseSubsidyRows = aggReverseSubsidy(reverse_subsidy, selectCity, columns);
 
 function buildSummaryTemplate(allRows, cols) {
   const rows = [...allRows];
@@ -410,7 +409,7 @@ const periodSummaryCols = d3.range(yearFrom, yearTo + 1).map(y => ({
 }));
 
 function buildSummaryForCols(cols) {
-  const incR = aggByCut(incomes, "COD_INCO", displayIncCat, selectCity, cols, adjCatCodes, "Other capital revenues", updateIncCat);
+  const incR = aggByCut(incomes, "COD_INCO", updateIncCat, selectCity, cols, adjCatCodes, "Capital revenues", updateIncCat);
   incR.forEach(r => r.CAT = "Income");
   const expRaw = aggByCut(expenses_econ, "COD_CONS_EK", updateExpCat, selectCity, cols, capExpSet, "Capital expenditures");
   const expR = expRaw.map(r => ({
@@ -421,7 +420,7 @@ function buildSummaryForCols(cols) {
   const finR  = aggFinancing(debts, selectCity, cols);
   const credR = aggCredits(credits, selectCity, cols);
   const cashR = aggCash(debts, selectCity, cols);
-  const revSubR = aggReverseSubsidy(expenses_func, selectCity, cols);
+  const revSubR = aggReverseSubsidy(reverse_subsidy, selectCity, cols);
   return buildSummaryTemplate([...incR, ...expR, ...finR, ...credR, ...cashR, ...revSubR], cols);
 }
 
@@ -555,9 +554,8 @@ display(html`<table style="width:100%; border-collapse:collapse; font-size:14px;
   <tbody>
     ${displayData.map(r => {
       const isTotal = r.CAT === "Total" || totalTypes.has(r.TYPE);
-      const isHighlighted = r.TYPE === "Current surplus" || r.TYPE === "Net surplus" || r.TYPE === "Net surplus before financing";
       const rowStyle = isTotal
-        ? `font-weight:700; border-top:1px solid var(--theme-foreground-faint)${isHighlighted ? "; background:#fffde7" : ""}`
+        ? `font-weight:700; border-top:1px solid var(--theme-foreground-faint); background:#fffde7`
         : "";
       return html`<tr style="border-bottom:1px solid var(--theme-foreground-faintest); ${rowStyle}">
         <td style="padding:4px 8px; vertical-align:middle">${r.CAT}</td>
@@ -790,10 +788,10 @@ function buildSummaryBreakdownRows(incData, expData, debtsData, creditsData, cit
   // Income: type → modelCat → code → entry
   const incAgg = {};
   for (const d of incData.filter(d => d.CITY === city && d.FUND_TYP === "T")) {
-    let type = categorize(d.COD_INCO, displayIncCat);
+    let type = categorize(d.COD_INCO, updateIncCat);
     if (adjCatCodes.has(d.COD_INCO)) {
       const naturalType = categorize(d.COD_INCO, updateIncCat);
-      if (naturalType === type) type = "Other capital revenues";
+      if (naturalType === type) type = "Capital revenues";
     }
     if (!type) continue;
     const mc = categorize(d.COD_INCO, modelIncCat) || type;
@@ -888,7 +886,7 @@ function buildSummaryBreakdownRows(incData, expData, debtsData, creditsData, cit
 
   // Reverse subsidy breakdown by KEKV economic code
   const revSubBreak = {};
-  for (const d of (expFuncEconData || []).filter(d => d.CITY === city && d.FUND_TYP === "T" && d.COD_CONS_MB_FK === reverseSubsidyFkvCode)) {
+  for (const d of (expFuncEconData || []).filter(d => d.CITY === city && d.FUND_TYP === "T")) {
     const code = d.COD_CONS_EK;
     const yr = d.REP_PERIOD.getUTCFullYear(), mo = d.REP_PERIOD.getUTCMonth() + 1;
     if (!revSubBreak[code]) revSubBreak[code] = { name: kekNameByCode.get(code) || `Code ${code}`, actuals: zeroActuals(), budget: 0 };
@@ -1142,10 +1140,16 @@ async function downloadXlsx() {
 
   const fsCombined = buildSummaryForCols(allRealCols);
   addSummaryFinancialsSheet(wb, fsCombined, allCombinedCols, "Financial summary", diffSpecs);
-  const sbCombined = buildSummaryBreakdownRows(incomes, expenses_econ, debts, credits, selectCity, allRealCols, fsCombined, expenses_func_econ);
+  const sbCombined = buildSummaryBreakdownRows(incomes, expenses_econ, debts, credits, selectCity, allRealCols, fsCombined, reverse_subsidy);
   addSummaryBreakdownSheet(wb, sbCombined, allCombinedCols, "Fin summary breakdown", diffSpecs);
   addFlatSheet(wb, capAdjSheet, "Capital adjustments", capAdjSheetHeader);
 
+  const expenses_func_econ = await FileAttachment("data/expenses-functional-economic.arrow").arrow()
+    .then(t => [...t].map(r => ({
+      CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
+      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK),
+      ZAT_AMT: r.ZAT_AMT, PLANS_AMT: r.PLANS_AMT, FAKT_AMT: r.FAKT_AMT
+    })));
   const expCrossRows = buildExpCrossClassRows(expenses_func_econ, kek_prep, fkv_prep, selectCity, allRealCols);
   addExpCrossClassSheet(wb, expCrossRows, allCombinedCols, "Expenses cross-functional", diffSpecs);
 

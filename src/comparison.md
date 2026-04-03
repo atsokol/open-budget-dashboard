@@ -11,6 +11,7 @@ Compare budget indicators across all Ukrainian municipalities.
 import * as d3 from "npm:d3";
 import * as aq from "npm:arquero";
 import {HorizontalComparisonChart} from "./components/horizontal-comparison.js";
+import {defaultCapitalIncomeCodes, defaultCapitalExpenseCodes, categorize} from "./components/capital-defaults.js";
 
 const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
   FileAttachment("data/classificators/KDB.json").json(),
@@ -43,12 +44,8 @@ const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
 
 const cfg = await FileAttachment("data/config.json").json();
-function categorize(code, cats) { for (const c of cats) if (code <= c.breakEnd) return c.name; return null; }
-const defaultCapIncCodes = [...new Set([
-  ...inck_prep.filter(d => d.level > 0).map(d => d.code),
-  ...incomes.map(d => d.COD_INCO)
-].filter(code => categorize(code, cfg.summaryIncomeCategories) === "Capital revenues"))];
-const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, cfg.summaryExpenseCategories) === "Capital expenditures").map(d => d.code);
+const defaultCapIncCodes = defaultCapitalIncomeCodes(inck_prep, incomes.map(d => d.COD_INCO), cfg.summaryIncomeCategories);
+const defaultCapExpCodes = defaultCapitalExpenseCodes(kek_prep, cfg.summaryExpenseCategories);
 
 const capIncSet = new Set((() => {
   try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }

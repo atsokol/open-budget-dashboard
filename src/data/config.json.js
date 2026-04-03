@@ -30,25 +30,9 @@ function deriveCategories(modelCats, nameFn) {
   return result;
 }
 
-// Summary (fiscal group) level: grandparent ?? parent — used by adjustments to detect capital codes.
-function deriveSummaryCategories(modelCats) {
-  return deriveCategories(modelCats, e => e.grandparent || e.parent);
-}
-
-// Display level: parent — produces named sub-rows (Interest received, Sale of assets, etc.).
-function deriveDisplayCategories(modelCats) {
+// Derive summary/display categories from the parent field.
+function deriveParentCategories(modelCats) {
   return deriveCategories(modelCats, e => e.parent);
-}
-
-// Build a hierarchy index: { summaryName: [modelName, ...] } with unique ordered model names.
-function buildHierarchyIndex(modelCats) {
-  const index = new Map();
-  for (const e of modelCats) {
-    if (!index.has(e.parent)) index.set(e.parent, []);
-    const arr = index.get(e.parent);
-    if (!arr.includes(e.name)) arr.push(e.name);
-  }
-  return Object.fromEntries(index);
 }
 
 // Strip the parent field for backward-compatible model category lists.
@@ -75,22 +59,10 @@ const result = {
   modelIncomeCategories:      stripParent(modelIncomeCats),
   modelExpenseCategories:     stripParent(modelExpenseCats),
 
-  // Summary-level — derived from model (eliminates the old manual summary_* lists)
-  summaryIncomeCategories:    deriveSummaryCategories(modelIncomeCats),
-  summaryExpenseCategories:   deriveSummaryCategories(modelExpenseCats),
+  // Summary/display-level — derived from the parent field in model entries
+  summaryIncomeCategories:    deriveParentCategories(modelIncomeCats),
+  summaryExpenseCategories:   deriveParentCategories(modelExpenseCats),
 
-  // Display-level — like summary but uses display_parent where set, creating named sub-rows
-  displayIncomeCategories:    deriveDisplayCategories(modelIncomeCats),
-
-  // Annotated model lists — include parent field for per-row hierarchy lookups
-  annotatedIncomeCategories:  modelIncomeCats,
-  annotatedExpenseCategories: modelExpenseCats,
-
-  // Hierarchy index: summaryName -> [modelName, ...]
-  incomeHierarchy:            buildHierarchyIndex(modelIncomeCats),
-  expenseHierarchy:           buildHierarchyIndex(modelExpenseCats),
-
-  reverseSubsidyFkvCode:      config.reverse_subsidy_fkv_code,
   financingCodes:             config.financing_codes,
   cashCodes:                  config.cash_codes,
   summaryTotals:              config.summary_totals,
