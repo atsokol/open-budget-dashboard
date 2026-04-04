@@ -101,11 +101,11 @@ const defaultCapIncCodes = [...new Set([
 ].filter(code => categorize(code, updateIncCat) === "Capital revenues"))];
 const defaultCapExpCodes = kek_prep.filter(d => d.level > 0 && categorize(d.code, updateExpCat) === "Capital expenditures").map(d => d.code);
 const capIncSet = new Set((() => {
-  try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }
+  try { const s = sessionStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }
   catch { return defaultCapIncCodes; }
 })());
 const capExpSet = new Set((() => {
-  try { const s = localStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : defaultCapExpCodes; }
+  try { const s = sessionStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : defaultCapExpCodes; }
   catch { return defaultCapExpCodes; }
 })());
 
@@ -119,7 +119,7 @@ const availableYears = [...new Set(incomes.map(d => d.REP_PERIOD.getUTCFullYear(
 
 ```js
 const params = new URLSearchParams(location.search);
-const initialCity     = params.get("city") ?? localStorage.getItem("selectedCity") ?? "Cherkasy";
+const initialCity     = params.get("city") ?? sessionStorage.getItem("selectedCity") ?? "Cherkasy";
 const initialYearTo   = +(params.get("yearTo")   ?? Math.max(...availableYears));
 const initialYearFrom = +(params.get("yearFrom") ?? Math.min(...availableYears));
 const initialPeriod   = params.get("period")     ?? "Latest";
@@ -167,7 +167,7 @@ const selectPeriod = view(Inputs.select(["Latest", "3m", "6m", "9m", "FY"], {
   const p = new URLSearchParams(location.search);
   p.set("city", selectCity); p.set("yearTo", yearTo); p.set("yearFrom", yearFrom); p.set("period", selectPeriod);
   history.replaceState(null, "", "?" + p.toString());
-  localStorage.setItem("selectedCity", selectCity);
+  sessionStorage.setItem("selectedCity", selectCity);
 }
 ```
 

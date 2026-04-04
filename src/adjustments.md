@@ -10,9 +10,9 @@ Configure which budget categories should be excluded from the current surplus ca
 ```js
 Inputs.button("Reset to Defaults", {
   reduce: () => {
-    localStorage.removeItem('capitalSettingsVersion');
-    localStorage.removeItem('capitalIncomeCodes');
-    localStorage.removeItem('capitalExpenseCodes');
+    sessionStorage.removeItem('capitalSettingsVersion');
+    sessionStorage.removeItem('capitalIncomeCodes');
+    sessionStorage.removeItem('capitalExpenseCodes');
     location.reload();
   }
 })
@@ -41,7 +41,7 @@ const kek_prep = Array.from(new Map(
 ).values()).sort((a, b) => a.code - b.code);
 
 // Load data to filter tree to codes present for the selected city
-const selectedCity = localStorage.getItem("selectedCity");
+const selectedCity = sessionStorage.getItem("selectedCity");
 const [inc_raw, exp_raw] = await Promise.all([
   FileAttachment("data/incomes.arrow").arrow(),
   FileAttachment("data/expenses.arrow").arrow()
@@ -57,27 +57,27 @@ const presentExpCodes = new Set(
 const defaultCapIncCodes = defaultCapitalIncomeCodes(inck_prep, presentIncCodes, cfg.summaryIncomeCategories);
 const defaultCapExpCodes = defaultCapitalExpenseCodes(kek_prep, cfg.summaryExpenseCategories);
 
-// Version key to invalidate cached localStorage when defaults change
+// Version key to invalidate cached sessionStorage when defaults change
 const CAPITAL_SETTINGS_VERSION = "v4";
-const versionKey = localStorage.getItem('capitalSettingsVersion');
+const versionKey = sessionStorage.getItem('capitalSettingsVersion');
 if (versionKey !== CAPITAL_SETTINGS_VERSION) {
-  localStorage.removeItem('capitalIncomeCodes');
-  localStorage.removeItem('capitalExpenseCodes');
-  localStorage.setItem('capitalSettingsVersion', CAPITAL_SETTINGS_VERSION);
+  sessionStorage.removeItem('capitalIncomeCodes');
+  sessionStorage.removeItem('capitalExpenseCodes');
+  sessionStorage.setItem('capitalSettingsVersion', CAPITAL_SETTINGS_VERSION);
 }
 
-// Load saved selections from localStorage or use defaults
+// Load saved selections from sessionStorage or use defaults
 const loadSavedIncomeCodes = () => {
-  const saved = localStorage.getItem('capitalIncomeCodes');
+  const saved = sessionStorage.getItem('capitalIncomeCodes');
   if (saved) return JSON.parse(saved);
-  localStorage.setItem('capitalIncomeCodes', JSON.stringify(defaultCapIncCodes));
+  sessionStorage.setItem('capitalIncomeCodes', JSON.stringify(defaultCapIncCodes));
   return defaultCapIncCodes;
 };
 
 const loadSavedExpenseCodes = () => {
-  const saved = localStorage.getItem('capitalExpenseCodes');
+  const saved = sessionStorage.getItem('capitalExpenseCodes');
   if (saved) return JSON.parse(saved);
-  localStorage.setItem('capitalExpenseCodes', JSON.stringify(defaultCapExpCodes));
+  sessionStorage.setItem('capitalExpenseCodes', JSON.stringify(defaultCapExpCodes));
   return defaultCapExpCodes;
 };
 
@@ -167,7 +167,7 @@ const incomeHierarchy = buildHierarchy(inck_prep.filter(d => d.level > 0));
             currentSelection.delete(code);
           }
         });
-        localStorage.setItem('capitalIncomeCodes', JSON.stringify([...currentSelection]));
+        sessionStorage.setItem('capitalIncomeCodes', JSON.stringify([...currentSelection]));
         updateAllCheckboxStates();
         updateCount();
       };
@@ -202,7 +202,7 @@ const incomeHierarchy = buildHierarchy(inck_prep.filter(d => d.level > 0));
             currentSelection.delete(code);
           }
         });
-        localStorage.setItem('capitalIncomeCodes', JSON.stringify([...currentSelection]));
+        sessionStorage.setItem('capitalIncomeCodes', JSON.stringify([...currentSelection]));
         updateAllCheckboxStates();
         updateCount();
       };
@@ -303,7 +303,7 @@ const expenseHierarchy = buildHierarchy(kek_prep.filter(d => d.level > 0));
             currentSelection.delete(code);
           }
         });
-        localStorage.setItem('capitalExpenseCodes', JSON.stringify([...currentSelection]));
+        sessionStorage.setItem('capitalExpenseCodes', JSON.stringify([...currentSelection]));
         updateAllCheckboxStates();
         updateCount();
       };
@@ -338,7 +338,7 @@ const expenseHierarchy = buildHierarchy(kek_prep.filter(d => d.level > 0));
             currentSelection.delete(code);
           }
         });
-        localStorage.setItem('capitalExpenseCodes', JSON.stringify([...currentSelection]));
+        sessionStorage.setItem('capitalExpenseCodes', JSON.stringify([...currentSelection]));
         updateAllCheckboxStates();
         updateCount();
       };
@@ -385,9 +385,9 @@ const expenseHierarchy = buildHierarchy(kek_prep.filter(d => d.level > 0));
     ${Inputs.button("Reset to Defaults", {
       reduce: () => {
         // Clear version to force recalculation of defaults
-        localStorage.removeItem('capitalSettingsVersion');
-        localStorage.removeItem('capitalIncomeCodes');
-        localStorage.removeItem('capitalExpenseCodes');
+        sessionStorage.removeItem('capitalSettingsVersion');
+        sessionStorage.removeItem('capitalIncomeCodes');
+        sessionStorage.removeItem('capitalExpenseCodes');
         location.reload();
       }
     })}

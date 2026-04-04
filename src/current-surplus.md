@@ -48,11 +48,11 @@ const cfg = await FileAttachment("data/config.json").json();
 const defaultCapIncCodes = defaultCapitalIncomeCodes(inck_prep, incomes.map(d => d.COD_INCO), cfg.summaryIncomeCategories);
 const defaultCapExpCodes = defaultCapitalExpenseCodes(kek_prep, cfg.summaryExpenseCategories);
 const capitalIncomeCodes = (() => {
-  try { const s = localStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }
+  try { const s = sessionStorage.getItem("capitalIncomeCodes"); return s ? JSON.parse(s) : defaultCapIncCodes; }
   catch { return defaultCapIncCodes; }
 })();
 const capitalExpenseCodes = (() => {
-  try { const s = localStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : defaultCapExpCodes; }
+  try { const s = sessionStorage.getItem("capitalExpenseCodes"); return s ? JSON.parse(s) : defaultCapExpCodes; }
   catch { return defaultCapExpCodes; }
 })();
 const capIncSet = new Set(capitalIncomeCodes);
@@ -64,9 +64,9 @@ const availableYears = [...new Set(incomes.map(d => d.REP_PERIOD.getUTCFullYear(
 
 ```js
 const params = new URLSearchParams(location.search);
-const initialCity     = params.get("city") ?? localStorage.getItem("selectedCity") ?? "Cherkasy";
-const initialYear     = +(params.get("year")     ?? localStorage.getItem("selectedYear") ?? Math.max(...availableYears));
-const initialBaseYear = +(params.get("baseYear") ?? localStorage.getItem("selectedBaseYear") ?? Math.max(...availableYears) - 1);
+const initialCity     = params.get("city") ?? sessionStorage.getItem("selectedCity") ?? "Cherkasy";
+const initialYear     = +(params.get("year")     ?? sessionStorage.getItem("selectedYear") ?? Math.max(...availableYears));
+const initialBaseYear = +(params.get("baseYear") ?? sessionStorage.getItem("selectedBaseYear") ?? Math.max(...availableYears) - 1);
 ```
 
 <div class="grid grid-cols-3" style="gap: 0.5rem; margin-bottom: 1rem;">
@@ -102,9 +102,9 @@ const baseYear = view(Inputs.select(availableYears.slice(-5, -1), {
   const p = new URLSearchParams(location.search);
   p.set("city", selectCity); p.set("year", selectYear); p.set("baseYear", baseYear);
   history.replaceState(null, "", "?" + p.toString());
-  localStorage.setItem("selectedCity", selectCity);
-  localStorage.setItem("selectedYear", selectYear);
-  localStorage.setItem("selectedBaseYear", baseYear);
+  sessionStorage.setItem("selectedCity", selectCity);
+  sessionStorage.setItem("selectedYear", selectYear);
+  sessionStorage.setItem("selectedBaseYear", baseYear);
 }
 
 const month_max = Math.max(...incomes

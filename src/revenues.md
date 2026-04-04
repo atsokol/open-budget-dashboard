@@ -52,9 +52,9 @@ const availableYears = [...new Set(data.map(d => d.year))].sort();
 
 ```js
 const params = new URLSearchParams(location.search);
-const initialCity     = params.get("city") ?? localStorage.getItem("selectedCity") ?? "Cherkasy";
-const initialYear     = +(params.get("year")     ?? localStorage.getItem("selectedYear") ?? Math.max(...availableYears));
-const initialBaseYear = +(params.get("baseYear") ?? localStorage.getItem("selectedBaseYear") ?? Math.max(...availableYears) - 1);
+const initialCity     = params.get("city") ?? sessionStorage.getItem("selectedCity") ?? "Cherkasy";
+const initialYear     = +(params.get("year")     ?? sessionStorage.getItem("selectedYear") ?? Math.max(...availableYears));
+const initialBaseYear = +(params.get("baseYear") ?? sessionStorage.getItem("selectedBaseYear") ?? Math.max(...availableYears) - 1);
 ```
 
 <div class="grid grid-cols-3" style="gap: 0.5rem; margin-bottom: 1rem;">
@@ -90,9 +90,9 @@ const baseYear = view(Inputs.select(availableYears.slice(-5, -1), {
   const p = new URLSearchParams(location.search);
   p.set("city", selectCity); p.set("year", selectYear); p.set("baseYear", baseYear);
   history.replaceState(null, "", "?" + p.toString());
-  localStorage.setItem("selectedCity", selectCity);
-  localStorage.setItem("selectedYear", selectYear);
-  localStorage.setItem("selectedBaseYear", baseYear);
+  sessionStorage.setItem("selectedCity", selectCity);
+  sessionStorage.setItem("selectedYear", selectYear);
+  sessionStorage.setItem("selectedBaseYear", baseYear);
 }
 
 const month_max = Math.max(...incomes
