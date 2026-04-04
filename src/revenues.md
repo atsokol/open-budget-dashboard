@@ -15,19 +15,19 @@ const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
 const incomes = await FileAttachment("data/incomes.arrow").arrow()
   .then(t => [...t].map(r => ({
     CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-    FUND_TYP: r.FUND_TYP, COD_INCO: Number(r.COD_INCO), NAME_INC: r.NAME_INC, FAKT_AMT: r.FAKT_AMT
+    FUND_TYP: r.FUND_TYP, COD_INCO: r.COD_INCO, NAME_INC: r.NAME_INC, FAKT_AMT: r.FAKT_AMT
   })));
 ```
 
 ```js
 function prepClassificator(raw, rootName) {
   return [
-    {code: 0, parentCode: null, name: rootName, level: 0},
+    {code: "0", parentCode: null, name: rootName, level: 0},
     ...Array.from(new Map(
       raw.filter(d => d.dateto == null)
-         .map(d => ({code: +d.code, parentCode: d.parentCode ? +d.parentCode : 0, name: d.name, level: d.level}))
+         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
          .map(d => [d.code, d])
-    ).values()).sort((a, b) => a.code - b.code)
+    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
   ];
 }
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");

@@ -19,12 +19,12 @@ const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
   FileAttachment("data/incomes.arrow").arrow()
     .then(t => [...t].map(r => ({
       CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-      FUND_TYP: r.FUND_TYP, COD_INCO: Number(r.COD_INCO), FAKT_AMT: r.FAKT_AMT
+      FUND_TYP: r.FUND_TYP, COD_INCO: r.COD_INCO, FAKT_AMT: r.FAKT_AMT
     }))),
   FileAttachment("data/expenses.arrow").arrow()
     .then(t => [...t].map(r => ({
       CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), FAKT_AMT: r.FAKT_AMT
+      FUND_TYP: r.FUND_TYP, COD_CONS_EK: r.COD_CONS_EK, FAKT_AMT: r.FAKT_AMT
     })))
 ]);
 ```
@@ -32,12 +32,12 @@ const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
 ```js
 function prepClassificator(raw, rootName) {
   return [
-    {code: 0, parentCode: null, name: rootName, level: 0},
+    {code: "0", parentCode: null, name: rootName, level: 0},
     ...Array.from(new Map(
       raw.filter(d => d.dateto == null)
-         .map(d => ({code: +d.code, parentCode: d.parentCode ? +d.parentCode : 0, name: d.name, level: d.level}))
+         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
          .map(d => [d.code, d])
-    ).values()).sort((a, b) => a.code - b.code)
+    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
   ];
 }
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
@@ -66,7 +66,8 @@ const data = (() => {
     const amt = d.FAKT_AMT || 0;
     agg[k].income += amt;
     if (!capIncSet.has(d.COD_INCO)) agg[k].income_curr += amt;
-    if (d.COD_INCO >= 40000000 && d.COD_INCO < 50000000) agg[k].income_transfer += amt;
+    const _c = Number(d.COD_INCO);
+    if (_c >= 40000000 && _c < 50000000) agg[k].income_transfer += amt;
   }
   for (const d of expenses_econ) {
     if (d.FUND_TYP !== "T") continue;
@@ -160,18 +161,22 @@ const month_max = Math.max(...data_transform
   .filter(d => d.YEAR == selectYear)
   .map(d => d.MONTH));
 
-const data_pivot = aq.from(data_transform.filter(d => d.YEAR == baseYear || d.YEAR == selectYear))
-  .groupby(["CITY", "MONTH"])
-  .pivot(["YEAR"], [selectIndicator.indicator])
-  .rename(aq.names(["city", "month", "base", "current"]))
-  .objects();
+const data_pivot = selectYear === baseYear
+  ? []
+  : aq.from(data_transform.filter(d => d.YEAR == baseYear || d.YEAR == selectYear))
+      .groupby(["CITY", "MONTH"])
+      .pivot(["YEAR"], [selectIndicator.indicator])
+      .rename(aq.names(["city", "month", "base", "current"]))
+      .objects();
 
-const data_change = aq.from(data_pivot)
-  .groupby("city")
-  .filter(d => d.current != undefined)
-  .filter(d => d.month == aq.op.max(d.month))
-  .derive({pct_change: d => (d.current - d.base) / d.base})
-  .objects();
+const data_change = selectYear === baseYear
+  ? []
+  : aq.from(data_pivot)
+      .groupby("city")
+      .filter(d => d.current != undefined)
+      .filter(d => d.month == aq.op.max(d.month))
+      .derive({pct_change: d => (d.current - d.base) / aq.op.abs(d.base)})
+      .objects();
 ```
 
 

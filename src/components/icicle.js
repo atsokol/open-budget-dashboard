@@ -144,7 +144,8 @@ export function Icicle(data, {
   round = false,
   color = d3.interpolateRainbow,
   fill = "#ccc",
-  fillOpacity = 0.6
+  fillOpacity = 0.6,
+  colorDepth = 1
 } = {}) {
   // Create hierarchy from flat data
   const root = d3.stratify()
@@ -169,8 +170,10 @@ export function Icicle(data, {
   // Construct color scale
   let colorScale = null;
   if (color != null && root.children) {
-    colorScale = d3.scaleSequential([0, root.children.length - 1], color).unknown(fill);
-    root.children.forEach((child, i) => child.index = i);
+    let colorNodes = root.children;
+    for (let i = 1; i < colorDepth; i++) colorNodes = colorNodes.flatMap(c => c.children || []);
+    colorScale = d3.scaleSequential([0, colorNodes.length - 1], color).unknown(typeof fill === "string" ? fill : "#ccc");
+    colorNodes.forEach((node, i) => node._colorIdx = i);
   }
   
   // Create SVG
@@ -191,7 +194,9 @@ export function Icicle(data, {
   cell.append("rect")
     .attr("width", d => d.y1 - d.y0)
     .attr("height", d => d.x1 - d.x0)
-    .attr("fill", colorScale ? d => colorScale(d.ancestors().reverse()[1]?.index) : fill)
+    .attr("fill", colorScale
+      ? d => colorScale(d.ancestors().reverse()[colorDepth]?._colorIdx)
+      : (typeof fill === "function" ? d => fill(d.data) : fill))
     .attr("fill-opacity", fillOpacity);
   
   // Add text labels (only for cells with enough height)

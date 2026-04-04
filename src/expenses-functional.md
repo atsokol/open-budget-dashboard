@@ -16,12 +16,12 @@ const [fkv_raw, kekv_raw, expenses_func, expenses_func_econ] = await Promise.all
   FileAttachment("data/expenses-functional.arrow").arrow()
     .then(t => [...t].map(r => ({
       CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-      FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK), FAKT_AMT: r.FAKT_AMT
+      FUND_TYP: r.FUND_TYP, COD_CONS_MB_FK: r.COD_CONS_MB_FK, FAKT_AMT: r.FAKT_AMT
     }))),
   FileAttachment("data/expenses-functional-economic.arrow").arrow()
     .then(t => [...t].map(r => ({
       CITY: r.CITY, REP_PERIOD: new Date(r.REP_PERIOD),
-      FUND_TYP: r.FUND_TYP, COD_CONS_EK: Number(r.COD_CONS_EK), COD_CONS_MB_FK: Number(r.COD_CONS_MB_FK),
+      FUND_TYP: r.FUND_TYP, COD_CONS_EK: r.COD_CONS_EK, COD_CONS_MB_FK: r.COD_CONS_MB_FK,
       FAKT_AMT: r.FAKT_AMT
     })))
 ]);
@@ -30,12 +30,12 @@ const [fkv_raw, kekv_raw, expenses_func, expenses_func_econ] = await Promise.all
 ```js
 function prepClassificator(raw, rootName) {
   return [
-    {code: 0, parentCode: null, name: rootName, level: 0},
+    {code: "0", parentCode: null, name: rootName, level: 0},
     ...Array.from(new Map(
       raw.filter(d => d.dateto == null)
-         .map(d => ({code: +d.code, parentCode: d.parentCode ? +d.parentCode : 0, name: d.name, level: d.level}))
+         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
          .map(d => [d.code, d])
-    ).values()).sort((a, b) => a.code - b.code)
+    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
   ];
 }
 const fkv_prep  = prepClassificator(fkv_raw,  "Загальні видатки (функціональні)");
@@ -122,6 +122,19 @@ const exp_trtab = get_treetab(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectC
 display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
 ```
 
+```js
+// Build a stable color map (fkvL1Code → color) mirroring the first chart's rainbow scale,
+// sorted by descending value so colors match exactly.
+const fkvColorMap = (() => {
+  if (!exp_trtab || exp_trtab.length === 0) return new Map();
+  const root = d3.stratify().id(d => d.code).parentId(d => d.parentCode)(exp_trtab);
+  root.sum(d => Math.max(0, d.value || 0));
+  root.sort((a, b) => d3.descending(a.value, b.value));
+  const scale = d3.scaleSequential([0, root.children.length - 1], d3.interpolateRainbow);
+  return new Map(root.children.map((c, i) => [c.data.code, scale(i)]));
+})();
+```
+
 ---
 
 ## Expense (functional) change — ${selectCity} ${selectYear} vs ${baseYear}
@@ -180,10 +193,12 @@ function buildCrossClassFlatData(expFuncEcon, kekPrep, fkvPrep, city, year, mont
   for (const [key, val] of Object.entries(leafAgg)) {
     if (!val || val <= 0) continue;
     const [ekStr, fkvStr] = key.split("__");
-    const ekCode = +ekStr, fkvLeafCode = +fkvStr;
+    const ekCode = ekStr, fkvLeafCode = fkvStr;
     const ekNode  = kekByCode.get(ekCode);
     const fkvPath = getFkvPath(fkvLeafCode);
     if (!ekNode || !fkvPath) continue;
+
+    const fkvL1Code = fkvPath.l1 ? fkvPath.l1.code : undefined;
 
     const ekId = `ek_${ekCode}`;
     if (!interNodes.has(ekId))
@@ -194,19 +209,19 @@ function buildCrossClassFlatData(expFuncEcon, kekPrep, fkvPrep, city, year, mont
     if (fkvPath.l1 && fkvPath.l1.code !== fkvLeafCode) {
       const l1Id = `${ekCode}_${fkvPath.l1.code}`;
       if (!interNodes.has(l1Id))
-        interNodes.set(l1Id, {code: l1Id, parentCode: ekId, level: 2, name: fkvPath.l1.name});
+        interNodes.set(l1Id, {code: l1Id, parentCode: ekId, level: 2, name: fkvPath.l1.name, fkvL1Code});
       leafParentId = l1Id;
 
       if (fkvPath.l2 && fkvPath.l2.code !== fkvLeafCode) {
         const l2Id = `${ekCode}_${fkvPath.l2.code}`;
         if (!interNodes.has(l2Id))
-          interNodes.set(l2Id, {code: l2Id, parentCode: l1Id, level: 3, name: fkvPath.l2.name});
+          interNodes.set(l2Id, {code: l2Id, parentCode: l1Id, level: 3, name: fkvPath.l2.name, fkvL1Code});
         leafParentId = l2Id;
       }
     }
 
     const leafId = `${ekCode}__leaf__${fkvLeafCode}`;
-    leafNodes.push({code: leafId, parentCode: leafParentId, level: fkvPath.leaf.level + 1, name: fkvPath.leaf.name, value: val});
+    leafNodes.push({code: leafId, parentCode: leafParentId, level: fkvPath.leaf.level + 1, name: fkvPath.leaf.name, value: val, fkvL1Code});
   }
 
   return [...interNodes.values(), ...leafNodes];
@@ -214,7 +229,7 @@ function buildCrossClassFlatData(expFuncEcon, kekPrep, fkvPrep, city, year, mont
 
 const cross_trtab = buildCrossClassFlatData(expenses_func_econ, kekv_prep, fkv_prep, selectCity, selectYear, month_max);
 display(cross_trtab.length > 0
-  ? Icicle(cross_trtab, {label: d => d.name, width: 1152, height: 500})
+  ? Icicle(cross_trtab, {label: d => d.name, width: 1152, height: 500, color: null, fill: d => fkvColorMap.get(d.fkvL1Code) ?? "#ccc"})
   : html`<p style="color:gray">No cross-classification data available for ${selectCity} ${selectYear}.</p>`
 );
 ```

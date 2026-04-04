@@ -25,20 +25,20 @@ const cfg = await FileAttachment("data/config.json").json();
 const inck_table = await FileAttachment("data/classificators/KDB.json").json();
 const kek_table = await FileAttachment("data/classificators/KEKV.json").json();
 
-// Prepare classificator tables with deduplication and convert codes to numbers
+// Prepare classificator tables with deduplication and keep codes as strings
 const inck_prep = Array.from(new Map(
   inck_table
     .filter(d => d.dateto == null)  // Only active codes
-    .map(d => ({code: +d.code, parentCode: d.parentCode ? +d.parentCode : 0, name: d.name, level: d.level}))
+    .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
     .map(d => [d.code, d])
-).values()).sort((a, b) => a.code - b.code);
+).values()).sort((a, b) => Number(a.code) - Number(b.code));
 
 const kek_prep = Array.from(new Map(
   kek_table
     .filter(d => d.dateto == null)  // Only active codes
-    .map(d => ({code: +d.code, parentCode: d.parentCode ? +d.parentCode : 0, name: d.name, level: d.level}))
+    .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
     .map(d => [d.code, d])
-).values()).sort((a, b) => a.code - b.code);
+).values()).sort((a, b) => Number(a.code) - Number(b.code));
 
 // Load data to filter tree to codes present for the selected city
 const selectedCity = sessionStorage.getItem("selectedCity");
@@ -47,10 +47,10 @@ const [inc_raw, exp_raw] = await Promise.all([
   FileAttachment("data/expenses.arrow").arrow()
 ]);
 const presentIncCodes = new Set(
-  [...inc_raw].filter(r => !selectedCity || r.CITY === selectedCity).map(r => Number(r.COD_INCO))
+  [...inc_raw].filter(r => !selectedCity || r.CITY === selectedCity).map(r => r.COD_INCO)
 );
 const presentExpCodes = new Set(
-  [...exp_raw].filter(r => !selectedCity || r.CITY === selectedCity).map(r => Number(r.COD_CONS_EK))
+  [...exp_raw].filter(r => !selectedCity || r.CITY === selectedCity).map(r => r.COD_CONS_EK)
 );
 
 // Default selections derived from config categories
@@ -58,7 +58,7 @@ const defaultCapIncCodes = defaultCapitalIncomeCodes(inck_prep, presentIncCodes,
 const defaultCapExpCodes = defaultCapitalExpenseCodes(kek_prep, cfg.summaryExpenseCategories);
 
 // Version key to invalidate cached sessionStorage when defaults change
-const CAPITAL_SETTINGS_VERSION = "v4";
+const CAPITAL_SETTINGS_VERSION = "v5";
 const versionKey = sessionStorage.getItem('capitalSettingsVersion');
 if (versionKey !== CAPITAL_SETTINGS_VERSION) {
   sessionStorage.removeItem('capitalIncomeCodes');
@@ -81,9 +81,9 @@ const loadSavedExpenseCodes = () => {
   return defaultCapExpCodes;
 };
 
-// Build hierarchical structure - check for both null and 0 as root
+// Build hierarchical structure - check for both null, 0 and "0" as root
 function buildHierarchy(flatData, parentCode = null) {
-  const items = flatData.filter(d => d.parentCode === parentCode || (parentCode === null && d.parentCode === 0));
+  const items = flatData.filter(d => d.parentCode === parentCode || (parentCode === null && (d.parentCode === 0 || d.parentCode === "0")));
   return items.map(d => ({
     ...d,
     children: buildHierarchy(flatData, d.code)

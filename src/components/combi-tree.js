@@ -63,7 +63,7 @@ export function buildCombiTable(inck_table, kek_table, capIncSet) {
         name: "Capital revenues",
         code: 300000000,
         children: inck_table
-          .filter(d => d.code !== 0 && capIncSet.has(d.code))
+          .filter(d => d.code !== "0" && capIncSet.has(d.code))
           .map(d => ({code: d.code, name: d.name}))
       },
       {

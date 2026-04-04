@@ -2,7 +2,8 @@
 // Used by adjustments.md, current-surplus.md, and comparison.md.
 
 export function categorize(code, cats) {
-  for (const c of cats) if (code <= c.breakEnd) return c.name;
+  const n = Number(code);
+  for (const c of cats) if (n <= c.breakEnd) return c.name;
   return null;
 }
 

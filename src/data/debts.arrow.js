@@ -24,7 +24,7 @@ for (let i = 0; i < n; i++) {
   REP_PERIOD[i] = r.REP_PERIOD.getTime();
   FUND_TYP[i] = r.FUND_TYP;
   COD_BUDGET[i] = r.COD_BUDGET ?? null;
-  COD_FINA[i] = r.COD_FINA != null ? Number(r.COD_FINA) : null;
+  COD_FINA[i] = r.COD_FINA != null ? String(r.COD_FINA) : null;
   NAME_FIN[i] = r.NAME_FIN ?? null;
   ZAT_AMT[i] = r.ZAT_AMT ?? 0;
   FAKT_AMT[i] = r.FAKT_AMT ?? 0;
