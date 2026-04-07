@@ -11,6 +11,7 @@ Compare budget indicators across all Ukrainian municipalities.
 import * as d3 from "npm:d3";
 import * as aq from "npm:arquero";
 import {HorizontalComparisonChart} from "./components/horizontal-comparison.js";
+import {withDownload} from "./components/chart-download.js";
 import {defaultCapitalIncomeCodes, defaultCapitalExpenseCodes, categorize} from "./components/capital-defaults.js";
 
 const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
@@ -181,5 +182,5 @@ const data_change = selectYear === baseYear
 
 
 ```js
-HorizontalComparisonChart(data_change, selectCity, selectIndicator.name, month_max, selectYear, baseYear, d3.format(",d"))
+withDownload(HorizontalComparisonChart(data_change, selectCity, selectIndicator.name, month_max, selectYear, baseYear, d3.format(",d")), `comparison-${selectCity}-${selectYear}.png`)
 ```

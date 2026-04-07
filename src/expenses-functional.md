@@ -9,6 +9,7 @@ toc: false
 import * as d3 from "npm:d3";
 import {TrendsChart} from "./components/trends-chart.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
+import {withDownload} from "./components/chart-download.js";
 
 const [fkv_raw, kekv_raw, expenses_func, expenses_func_econ] = await Promise.all([
   FileAttachment("data/classificators/FKV.json").json(),
@@ -110,7 +111,7 @@ const month_max = Math.max(...expenses_func
 ```
 
 ```js
-TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH million")
+withDownload(TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH million"), `expenses-functional-trends-${selectCity}.png`)
 ```
 
 ---
@@ -119,7 +120,7 @@ TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH milli
 
 ```js
 const exp_trtab = get_treetab(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectCity, selectYear, month_max);
-display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}))
+display(withDownload(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450}), `expenses-functional-icicle-${selectCity}-${selectYear}.png`, {title: `Expense (functional) categories — ${selectCity} ${selectYear}`}))
 ```
 
 ```js
@@ -141,7 +142,7 @@ const fkvColorMap = (() => {
 
 ```js
 const exp_diff = get_treetab_diff(expenses_func, fkv_prep, "COD_CONS_MB_FK", selectCity, selectYear, baseYear, month_max);
-display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
+display(withDownload(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}), `expenses-functional-icicle-diff-${selectCity}-${selectYear}.png`, {title: `Expense (functional) change — ${selectCity} ${selectYear} vs ${baseYear}`}));
 ```
 
 ---
@@ -229,7 +230,7 @@ function buildCrossClassFlatData(expFuncEcon, kekPrep, fkvPrep, city, year, mont
 
 const cross_trtab = buildCrossClassFlatData(expenses_func_econ, kekv_prep, fkv_prep, selectCity, selectYear, month_max);
 display(cross_trtab.length > 0
-  ? Icicle(cross_trtab, {label: d => d.name, width: 1152, height: 500, color: null, fill: d => fkvColorMap.get(d.fkvL1Code) ?? "#ccc"})
+  ? withDownload(Icicle(cross_trtab, {label: d => d.name, width: 1152, height: 500, color: null, fill: d => fkvColorMap.get(d.fkvL1Code) ?? "#ccc"}), `expenses-cross-icicle-${selectCity}-${selectYear}.png`, {title: `Expense by economic class × functional category — ${selectCity} ${selectYear}`})
   : html`<p style="color:gray">No cross-classification data available for ${selectCity} ${selectYear}.</p>`
 );
 ```

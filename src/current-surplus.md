@@ -12,6 +12,7 @@ import * as d3 from "npm:d3";
 import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
 import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
+import {withDownload} from "./components/chart-download.js";
 import {defaultCapitalIncomeCodes, defaultCapitalExpenseCodes, categorize} from "./components/capital-defaults.js";
 
 const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
@@ -139,7 +140,7 @@ const trendData = (() => {
 ```
 
 ```js
-TrendsChart(trendData, selectCity, "Current surplus", "curr_surplus", d3.format(",d"), "UAH million")
+withDownload(TrendsChart(trendData, selectCity, "Current surplus", "curr_surplus", d3.format(",d"), "UAH million"), `current-surplus-trends-${selectCity}.png`)
 ```
 
 ---
@@ -194,7 +195,7 @@ const curr_surplus_wf = prepareWaterfallData(
   synth_data, synth_table, "COD", cs_root,
   selectCity, selectYear, month_max
 );
-display(WaterfallChart(curr_surplus_wf, `Current surplus waterfall: ${selectCity} ${selectYear}`, d3.format(",d"), "UAH million"))
+display(withDownload(WaterfallChart(curr_surplus_wf, `Current surplus waterfall: ${selectCity} ${selectYear}`, d3.format(",d"), "UAH million"), `waterfall-${selectCity}-${selectYear}.png`))
 ```
 
 ---
@@ -204,7 +205,7 @@ const curr_surplus_wfd = prepareWaterfallComparisonData(
   synth_data, synth_table, "COD", cs_root,
   selectCity, selectYear, baseYear, month_max
 );
-display(WaterfallComparisonChart(curr_surplus_wfd, `Current surplus change: ${selectCity} ${selectYear} vs ${baseYear}`, d3.format(",d"), "UAH million"))
+display(withDownload(WaterfallComparisonChart(curr_surplus_wfd, `Current surplus change: ${selectCity} ${selectYear} vs ${baseYear}`, d3.format(",d"), "UAH million"), `waterfall-comparison-${selectCity}-${selectYear}-vs-${baseYear}.png`))
 ```
 
 <div class="note">

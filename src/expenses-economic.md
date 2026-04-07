@@ -9,6 +9,7 @@ toc: false
 import * as d3 from "npm:d3";
 import {TrendsChart} from "./components/trends-chart.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
+import {withDownload} from "./components/chart-download.js";
 
 const kek_raw = await FileAttachment("data/classificators/KEKV.json").json();
 
@@ -101,7 +102,7 @@ const month_max = Math.max(...expenses_econ
 ```
 
 ```js
-TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH million")
+withDownload(TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH million"), `expenses-economic-trends-${selectCity}.png`)
 ```
 
 ---
@@ -110,7 +111,7 @@ TrendsChart(data, selectCity, "Expenses", "expense", d3.format(",d"), "UAH milli
 
 ```js
 const exp_trtab = get_treetab(expenses_econ, kek_prep, "COD_CONS_EK", selectCity, selectYear, month_max);
-display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450, colorDepth: 2}))
+display(withDownload(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450, colorDepth: 2}), `expenses-economic-icicle-${selectCity}-${selectYear}.png`, {title: `Expense (economic) categories — ${selectCity} ${selectYear}`}))
 ```
 
 ---
@@ -119,5 +120,5 @@ display(Icicle(exp_trtab, {label: d => d.name, width: 1152, height: 450, colorDe
 
 ```js
 const exp_diff = get_treetab_diff(expenses_econ, kek_prep, "COD_CONS_EK", selectCity, selectYear, baseYear, month_max);
-display(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}));
+display(withDownload(IcicleDiff(exp_diff, {label: d => d.name, width: 1152, height: 450}), `expenses-economic-icicle-diff-${selectCity}-${selectYear}.png`, {title: `Expense (economic) change — ${selectCity} ${selectYear} vs ${baseYear}`}));
 ```

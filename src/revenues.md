@@ -9,6 +9,7 @@ toc: false
 import * as d3 from "npm:d3";
 import {TrendsChart} from "./components/trends-chart.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
+import {withDownload} from "./components/chart-download.js";
 
 const inck_raw = await FileAttachment("data/classificators/KDB.json").json();
 
@@ -101,7 +102,7 @@ const month_max = Math.max(...incomes
 ```
 
 ```js
-TrendsChart(data, selectCity, "Revenues", "income", d3.format(",d"), "UAH million")
+withDownload(TrendsChart(data, selectCity, "Revenues", "income", d3.format(",d"), "UAH million"), `revenues-trends-${selectCity}.png`)
 ```
 
 ---
@@ -110,7 +111,7 @@ TrendsChart(data, selectCity, "Revenues", "income", d3.format(",d"), "UAH millio
 
 ```js
 const inc_trtab = get_treetab(incomes, inck_prep, "COD_INCO", selectCity, selectYear, month_max);
-display(Icicle(inc_trtab, {label: d => d.name, width: 1152, height: 450}))
+display(withDownload(Icicle(inc_trtab, {label: d => d.name, width: 1152, height: 450}), `revenues-icicle-${selectCity}-${selectYear}.png`, {title: `Revenue classification — ${selectCity} ${selectYear}`}))
 ```
 
 ---
@@ -119,5 +120,5 @@ display(Icicle(inc_trtab, {label: d => d.name, width: 1152, height: 450}))
 
 ```js
 const inc_diff = get_treetab_diff(incomes, inck_prep, "COD_INCO", selectCity, selectYear, baseYear, month_max);
-display(IcicleDiff(inc_diff, {label: d => d.name, width: 1152, height: 450}));
+display(withDownload(IcicleDiff(inc_diff, {label: d => d.name, width: 1152, height: 450}), `revenues-icicle-diff-${selectCity}-${selectYear}.png`, {title: `Revenue change — ${selectCity} ${selectYear} vs ${baseYear}`}));
 ```
