@@ -1,7 +1,7 @@
 // See https://observablehq.com/framework/config for documentation.
 export default {
   title: "Ukraine Municipal Budget Analysis",
-
+  head: '<script data-goatcounter="https://open-budget-dashboard.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>',
   pages: [
     {name: "Summary", path: "/"},
     {name: "Revenues", path: "/revenues"},
