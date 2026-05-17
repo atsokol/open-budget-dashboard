@@ -72,7 +72,7 @@ const selectCity = view(Inputs.select(cityNames, {label: "City", value: initialC
 <div>
 
 ```js
-const selectYear = view(Inputs.select(availableYears.slice(-4), {
+const selectYear = view(Inputs.select(availableYears, {
   label: "Year", value: initialYear, format: d => d.toString()
 }));
 ```
@@ -81,7 +81,7 @@ const selectYear = view(Inputs.select(availableYears.slice(-4), {
 <div>
 
 ```js
-const baseYear = view(Inputs.select(availableYears.slice(-5, -1), {
+const baseYear = view(Inputs.select(availableYears, {
   label: "Base year", value: initialBaseYear, format: d => d.toString()
 }));
 ```

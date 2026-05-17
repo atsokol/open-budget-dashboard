@@ -115,13 +115,13 @@ const selectCity = view(Inputs.select(cityNames, {label: "Highlight city", value
 ```
 
 ```js
-const selectYear = view(Inputs.select(availableYears.slice(-4), {
+const selectYear = view(Inputs.select(availableYears, {
   label: "Year", value: initialYear, format: d => d.toString()
 }));
 ```
 
 ```js
-const baseYear = view(Inputs.select(availableYears.slice(-5, -1), {
+const baseYear = view(Inputs.select(availableYears, {
   label: "Base year", value: initialBaseYear, format: d => d.toString()
 }));
 ```
@@ -153,10 +153,16 @@ const data_pivot = selectYear === baseYear
       .rename(aq.names(["city", "month", "base", "current"]))
       .objects();
 
-const baseRevenuesByCityMonth = Object.fromEntries(
+const baseIncCurrByCityMonth = Object.fromEntries(
   data_transform
     .filter(d => d.YEAR == baseYear)
-    .map(d => [`${d.CITY}|${d.MONTH}`, d.income])
+    .map(d => [`${d.CITY}|${d.MONTH}`, d.income_curr])
+);
+
+const currIncCurrByCityMonth = Object.fromEntries(
+  data_transform
+    .filter(d => d.YEAR == selectYear)
+    .map(d => [`${d.CITY}|${d.MONTH}`, d.income_curr])
 );
 
 const data_change = selectYear === baseYear
@@ -168,8 +174,16 @@ const data_change = selectYear === baseYear
       .derive({pct_change: d => (d.current - d.base) / aq.op.abs(d.base)})
       .objects()
       .map(d => selectIndicator.indicator === "curr_surplus"
-        ? {...d, pct_change: (d.current - d.base) / (baseRevenuesByCityMonth[`${d.city}|${d.month}`] || Math.abs(d.base))}
+        ? {
+            ...d,
+            pct_change: (d.current / (currIncCurrByCityMonth[`${d.city}|${d.month}`] || 1))
+                      - (d.base   / (baseIncCurrByCityMonth[`${d.city}|${d.month}`]   || 1))
+          }
         : d);
+
+const chartIndicatorName = selectIndicator.indicator === "curr_surplus"
+  ? "Current surplus / Current revenues ratio"
+  : selectIndicator.name;
 
 const data_ratios = data
   .filter(d => d.year == selectYear && d.month == month_max + 1 && d.income > 0)
@@ -197,5 +211,5 @@ const selectIndicator = view(Inputs.select(indicators, {label: "Indicator", form
 ```
 
 ```js
-withDownload(HorizontalComparisonChart(data_change, selectCity, selectIndicator.name, month_max, selectYear, baseYear), `comparison-${selectCity}-${selectYear}.png`)
+withDownload(HorizontalComparisonChart(data_change, selectCity, chartIndicatorName, month_max, selectYear, baseYear), `comparison-${selectCity}-${selectYear}.png`)
 ```
