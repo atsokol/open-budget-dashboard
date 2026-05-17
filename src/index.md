@@ -9,6 +9,7 @@ High-level financial summary table with plan vs actual figures.
 
 ```js
 import * as d3 from "npm:d3";
+import {prepClassificator} from "./components/waterfall-data.js";
 
 const [inck_raw, kek_raw, fkv_raw, incomes, expenses_econ, reverse_subsidy, debts, credits] = await Promise.all([
   FileAttachment("data/classificators/KDB.json").json(),
@@ -47,16 +48,6 @@ const [inck_raw, kek_raw, fkv_raw, incomes, expenses_econ, reverse_subsidy, debt
 ```
 
 ```js
-function prepClassificator(raw, rootName) {
-  return [
-    {code: "0", parentCode: null, name: rootName, level: 0},
-    ...Array.from(new Map(
-      raw.filter(d => d.dateto == null)
-         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
-         .map(d => [d.code, d])
-    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
-  ];
-}
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
 const fkv_prep  = prepClassificator(fkv_raw,  "Загальні видатки");

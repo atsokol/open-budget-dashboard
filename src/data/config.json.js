@@ -35,9 +35,10 @@ function deriveParentCategories(modelCats) {
   return deriveCategories(modelCats, e => e.parent);
 }
 
-// Strip the parent field for backward-compatible model category lists.
-function stripParent(cats) {
-  return cats.map(({ name, breakEnd }) => ({ name, breakEnd }));
+// Keep name, breakEnd, and parent for downstream consumers (parent is needed
+// for the hierarchical drill-down waterfall in current-surplus.md).
+function keepFields(cats) {
+  return cats.map(({ name, breakEnd, parent }) => ({ name, breakEnd, parent }));
 }
 
 // ── Validate ──────────────────────────────────────────────────────────────────
@@ -55,9 +56,9 @@ for (const e of modelExpenseCats) {
 // ── Build result ──────────────────────────────────────────────────────────────
 
 const result = {
-  // Model-level (detail) — backward-compatible, parent field stripped
-  modelIncomeCategories:      stripParent(modelIncomeCats),
-  modelExpenseCategories:     stripParent(modelExpenseCats),
+  // Model-level (detail) — includes parent field for hierarchical consumers
+  modelIncomeCategories:      keepFields(modelIncomeCats),
+  modelExpenseCategories:     keepFields(modelExpenseCats),
 
   // Summary/display-level — derived from the parent field in model entries
   summaryIncomeCategories:    deriveParentCategories(modelIncomeCats),

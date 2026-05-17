@@ -10,9 +10,10 @@ Compare budget indicators across all Ukrainian municipalities.
 ```js
 import * as d3 from "npm:d3";
 import * as aq from "npm:arquero";
-import {HorizontalComparisonChart} from "./components/horizontal-comparison.js";
+import {HorizontalComparisonChart, CityRatioChart} from "./components/horizontal-comparison.js";
 import {withDownload} from "./components/chart-download.js";
 import {defaultCapitalIncomeCodes, defaultCapitalExpenseCodes, categorize} from "./components/capital-defaults.js";
+import {prepClassificator, periodLabel} from "./components/waterfall-data.js";
 
 const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
   FileAttachment("data/classificators/KDB.json").json(),
@@ -31,16 +32,6 @@ const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
 ```
 
 ```js
-function prepClassificator(raw, rootName) {
-  return [
-    {code: "0", parentCode: null, name: rootName, level: 0},
-    ...Array.from(new Map(
-      raw.filter(d => d.dateto == null)
-         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
-         .map(d => [d.code, d])
-    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
-  ];
-}
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
 
@@ -63,12 +54,16 @@ const data = (() => {
   for (const d of incomes) {
     if (d.FUND_TYP !== "T") continue;
     const k = `${d.CITY}|${d.REP_PERIOD.getTime()}`;
-    if (!agg[k]) agg[k] = { CITY: d.CITY, REP_PERIOD: d.REP_PERIOD, income: 0, income_curr: 0, income_transfer: 0, expense: 0, expense_curr: 0 };
+    if (!agg[k]) agg[k] = { CITY: d.CITY, REP_PERIOD: d.REP_PERIOD, income: 0, income_curr: 0, income_own: 0, income_transfer: 0, expense: 0, expense_curr: 0 };
     const amt = d.FAKT_AMT || 0;
     agg[k].income += amt;
-    if (!capIncSet.has(d.COD_INCO)) agg[k].income_curr += amt;
     const _c = Number(d.COD_INCO);
-    if (_c >= 40000000 && _c < 50000000) agg[k].income_transfer += amt;
+    if (!capIncSet.has(d.COD_INCO)) agg[k].income_curr += amt;
+    if (_c >= 40000000 && _c < 50000000) {
+      agg[k].income_transfer += amt;
+    } else if (!capIncSet.has(d.COD_INCO)) {
+      agg[k].income_own += amt;
+    }
   }
   for (const d of expenses_econ) {
     if (d.FUND_TYP !== "T") continue;
@@ -83,6 +78,7 @@ const data = (() => {
     REP_PERIOD: d.REP_PERIOD,
     income: Math.round(d.income / 1e6 * 10) / 10,
     income_curr: Math.round(d.income_curr / 1e6 * 10) / 10,
+    income_own: Math.round(d.income_own / 1e6 * 10) / 10,
     expense: Math.round(d.expense / 1e6 * 10) / 10,
     expense_curr: Math.round(d.expense_curr / 1e6 * 10) / 10,
     income_transfer: Math.round(d.income_transfer / 1e6 * 10) / 10,
@@ -111,31 +107,18 @@ const indicators = [
 ];
 ```
 
-<div class="grid grid-cols-4" style="gap: 0.5rem; margin-bottom: 1rem;">
+<div style="display: flex; gap: 2rem; margin-bottom: 1rem; align-items: flex-start;">
 <div>
 
 ```js
 const selectCity = view(Inputs.select(cityNames, {label: "Highlight city", value: initialCity}));
 ```
 
-</div>
-<div>
-
-```js
-const selectIndicator = view(Inputs.select(indicators, {label: "Indicator", format: d => d.name}));
-```
-
-</div>
-<div>
-
 ```js
 const selectYear = view(Inputs.select(availableYears.slice(-4), {
   label: "Year", value: initialYear, format: d => d.toString()
 }));
 ```
-
-</div>
-<div>
 
 ```js
 const baseYear = view(Inputs.select(availableYears.slice(-5, -1), {
@@ -170,6 +153,12 @@ const data_pivot = selectYear === baseYear
       .rename(aq.names(["city", "month", "base", "current"]))
       .objects();
 
+const baseRevenuesByCityMonth = Object.fromEntries(
+  data_transform
+    .filter(d => d.YEAR == baseYear)
+    .map(d => [`${d.CITY}|${d.MONTH}`, d.income])
+);
+
 const data_change = selectYear === baseYear
   ? []
   : aq.from(data_pivot)
@@ -177,10 +166,36 @@ const data_change = selectYear === baseYear
       .filter(d => d.current != undefined)
       .filter(d => d.month == aq.op.max(d.month))
       .derive({pct_change: d => (d.current - d.base) / aq.op.abs(d.base)})
-      .objects();
+      .objects()
+      .map(d => selectIndicator.indicator === "curr_surplus"
+        ? {...d, pct_change: (d.current - d.base) / (baseRevenuesByCityMonth[`${d.city}|${d.month}`] || Math.abs(d.base))}
+        : d);
+
+const data_ratios = data
+  .filter(d => d.year == selectYear && d.month == month_max + 1 && d.income > 0)
+  .map(d => ({
+    city: d.CITY,
+    own_rev_share: d.income_own / d.income,
+    cs_rev_ratio: d.income_curr > 0 ? d.curr_surplus / d.income_curr : 0
+  }));
 ```
 
+<div class="grid grid-cols-2" style="gap: 0.5rem; margin-bottom: 1rem;">
 
 ```js
-withDownload(HorizontalComparisonChart(data_change, selectCity, selectIndicator.name, month_max, selectYear, baseYear, d3.format(",d")), `comparison-${selectCity}-${selectYear}.png`)
+withDownload(CityRatioChart(data_ratios.map(d => ({city: d.city, value: d.own_rev_share})), selectCity, `Own revenues share, ${periodLabel(month_max, selectYear)}`, d3.format(".1%")), `own-rev-share-${selectCity}-${selectYear}.png`)
+```
+
+```js
+withDownload(CityRatioChart(data_ratios.map(d => ({city: d.city, value: d.cs_rev_ratio})), selectCity, `Current surplus / current revenues, ${periodLabel(month_max, selectYear)}`, d3.format(".1%")), `cs-rev-ratio-${selectCity}-${selectYear}.png`)
+```
+
+</div>
+
+```js
+const selectIndicator = view(Inputs.select(indicators, {label: "Indicator", format: d => d.name}));
+```
+
+```js
+withDownload(HorizontalComparisonChart(data_change, selectCity, selectIndicator.name, month_max, selectYear, baseYear), `comparison-${selectCity}-${selectYear}.png`)
 ```

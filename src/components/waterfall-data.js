@@ -1,17 +1,21 @@
 import * as d3 from "npm:d3";
 import * as aq from "npm:arquero";
 
+export const periodLabel = (month_max, year) =>
+  month_max === 11 ? `${year}` : `${month_max + 1}m ${year}`;
+
 // Transform data for waterfall chart (single year - showing components)
 export function prepareWaterfallData(data, c_table, codeString, selectCat, selectCity, selectYear, month_max, adjust = false) {
   const c_tree = d3.stratify()
     .id(d => d.code)
     .parentId(d => d.parentCode)(c_table);
-  
-  const c_leaves = c_tree.descendants().find(d => d.id == selectCat.code).copy().descendants();
-  
+
+  const selectNode = c_tree.descendants().find(d => d.id == selectCat.code);
+  const groupDepth = selectNode.depth + 1;   // 1 for root, 2 for L1 summary parents
+  const c_leaves = selectNode.descendants(); // no .copy() — preserves absolute depths
+
   const getGroupCode = (node) => {
-    const ancestor = node.ancestors().find(d => d.depth === 1);
-    return ancestor ? ancestor.data.code : null;
+    return node.ancestors().find(d => d.depth === groupDepth)?.data.code ?? null;
   };
   
   const codeMap = c_leaves.map(d => ({
@@ -66,11 +70,11 @@ export function prepareWaterfallData(data, c_table, codeString, selectCat, selec
     .objects()
     .map(d => ({
       ...d,
-      key: d.key === "Total" ? `${selectCat.name}\n${month_max + 1}m ${selectYear}` : d.key
+      key: d.key === "Total" ? `${selectCat.name}\n${periodLabel(month_max, selectYear)}` : d.key
     }));
-  
+
   // Update nextKey references to point to renamed Total
-  const totalName = `${selectCat.name}\n${month_max + 1}m ${selectYear}`;
+  const totalName = `${selectCat.name}\n${periodLabel(month_max, selectYear)}`;
   arr.forEach((d, i) => {
     if (d.nextKey === "Total") {
       arr[i].nextKey = totalName;
@@ -168,16 +172,16 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
     .objects()
     .map(d => ({
       ...d,
-      key: d.key === "Total" 
-        ? `${selectCat.name}\n${month_max + 1}m ${selectYear}` 
-        : (d.key === "Total_lag" 
-          ? `${selectCat.name}\n${month_max + 1}m ${baseYear}` 
+      key: d.key === "Total"
+        ? `${selectCat.name}\n${periodLabel(month_max, selectYear)}`
+        : (d.key === "Total_lag"
+          ? `${selectCat.name}\n${periodLabel(month_max, baseYear)}`
           : (codeToName[d.key] || d.key))
     }));
-  
+
   // Update nextKey references: map codes to names and rename Total/Total_lag
-  const baseYearName = `${selectCat.name}\n${month_max + 1}m ${baseYear}`;
-  const currentYearName = `${selectCat.name}\n${month_max + 1}m ${selectYear}`;
+  const baseYearName = `${selectCat.name}\n${periodLabel(month_max, baseYear)}`;
+  const currentYearName = `${selectCat.name}\n${periodLabel(month_max, selectYear)}`;
   arr.forEach((d, i) => {
     if (d.nextKey === "Total_lag") {
       arr[i].nextKey = baseYearName;
@@ -190,14 +194,14 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
   
   // Adjust base year if needed (for EUR mode to show at original rate)
   if (baseYearAdjustment !== null) {
-    const baseLagIndex = arr.findIndex(d => d.key.includes(baseYear.toString()) && d.key.includes('m '));
+    const baseLagIndex = arr.findIndex(d => d.key.includes(String(baseYear)) && d.key.includes('\n'));
     if (baseLagIndex !== -1) {
       arr[baseLagIndex].value += baseYearAdjustment;
       arr[baseLagIndex].accu += baseYearAdjustment;
       
       // Recalculate all subsequent prior and accu values
       for (let i = baseLagIndex + 1; i < arr.length; i++) {
-        if (arr[i].key.includes(selectYear.toString()) && arr[i].key.includes('m ')) {
+        if (arr[i].key.includes(String(selectYear)) && arr[i].key.includes('\n')) {
           // Skip recalc for final Total (it has prior=0)
           break;
         }
@@ -210,7 +214,7 @@ export function prepareWaterfallComparisonData(data, c_table, codeString, select
   // Insert FX adjustment if provided (EUR mode)
   if (fxAdjustment !== null && Math.abs(fxAdjustment) > 0.01) {
     // Find the Total (current year) index - should be the last item
-    const totalIndex = arr.findIndex(d => d.key.includes(selectYear.toString()) && d.key.includes('m '));
+    const totalIndex = arr.findIndex(d => d.key.includes(String(selectYear)) && d.key.includes('\n'));
     if (totalIndex !== -1) {
       // Insert FX adjustment before the Total
       const fxItem = {
@@ -270,4 +274,66 @@ export function hierarchyToTable(root) {
     });
   });
   return table;
+}
+
+// Prepare a flat classificator table from raw JSON (deduplicates by code, excludes expired entries)
+export function prepClassificator(raw, rootName) {
+  return [
+    {code: "0", parentCode: null, name: rootName, level: 0},
+    ...Array.from(new Map(
+      raw.filter(d => d.dateto == null)
+         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
+         .map(d => [d.code, d])
+    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
+  ];
+}
+
+// Build synthetic flat classificator tables from Financial Model categories.
+// Returns {incCatCode, expCatCode, synth_table (2-level), synth_table_hier (3-level)}.
+export function buildSynthClassificator(modelIncCat, modelExpCat, {
+  excludeIncParent = "Capital revenues",
+  excludeExpParent = "Capital expenditures",
+  rootName = "Current surplus"
+} = {}) {
+  const incCatNames = [...new Map(modelIncCat.map(d => [d.name, true])).keys()];
+  const expCatNames = [...new Map(modelExpCat.map(d => [d.name, true])).keys()];
+  const incCatCode = Object.fromEntries(incCatNames.map((n, i) => [n, i + 1]));
+  const expCatCode = Object.fromEntries(expCatNames.map((n, i) => [n, incCatNames.length + i + 1]));
+
+  const synth_table = [
+    {code: 0, parentCode: null, name: rootName, level: 0},
+    ...incCatNames.map(n => ({code: incCatCode[n], parentCode: 0, name: n, level: 1})),
+    ...expCatNames.map(n => ({code: expCatCode[n], parentCode: 0, name: n, level: 1})),
+  ];
+
+  const incByParent = d3.group(modelIncCat.filter(d => d.parent !== excludeIncParent), d => d.parent);
+  const expByParent = d3.group(modelExpCat.filter(d => d.parent !== excludeExpParent), d => d.parent);
+
+  // Dedupe children by name: model categories may have multiple breakEnd ranges
+  // sharing the same name (e.g. "Current discretionary expenditure"), which would
+  // otherwise produce duplicate sibling nodes with the same code and break
+  // aggregation joins downstream.
+  const dedupeCats = (cats, codeOf) =>
+    [...new Map(cats.map(d => [d.name, {name: d.name, code: codeOf[d.name]}])).values()];
+
+  const synth_table_hier = d3.hierarchy({
+    name: rootName, code: 0,
+    children: [
+      ...[...incByParent].map(([parent, cats], i) => ({
+        name: parent, code: (i + 1) * 100,
+        children: dedupeCats(cats, incCatCode)
+      })),
+      ...[...expByParent].map(([parent, cats], i) => ({
+        name: parent, code: (incByParent.size + i + 1) * 100,
+        children: dedupeCats(cats, expCatCode)
+      }))
+    ]
+  }).descendants().map(node => ({
+    code: node.data.code,
+    parentCode: node.parent?.data.code ?? null,
+    name: node.data.name,
+    level: node.depth
+  }));
+
+  return {incCatCode, expCatCode, synth_table, synth_table_hier};
 }

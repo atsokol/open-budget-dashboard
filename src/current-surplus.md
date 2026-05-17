@@ -11,7 +11,8 @@ Current surplus = current (non-capital) revenues − current (non-capital) expen
 import * as d3 from "npm:d3";
 import {TrendsChart} from "./components/trends-chart.js";
 import {WaterfallChart, WaterfallComparisonChart} from "./components/waterfall.js";
-import {prepareWaterfallData, prepareWaterfallComparisonData} from "./components/waterfall-data.js";
+import {DrilldownWaterfallChart} from "./components/waterfall-drilldown.js";
+import {prepareWaterfallData, prepareWaterfallComparisonData, prepClassificator, buildSynthClassificator} from "./components/waterfall-data.js";
 import {withDownload} from "./components/chart-download.js";
 import {defaultCapitalIncomeCodes, defaultCapitalExpenseCodes, categorize} from "./components/capital-defaults.js";
 
@@ -32,16 +33,6 @@ const [inck_raw, kek_raw, incomes, expenses_econ] = await Promise.all([
 ```
 
 ```js
-function prepClassificator(raw, rootName) {
-  return [
-    {code: "0", parentCode: null, name: rootName, level: 0},
-    ...Array.from(new Map(
-      raw.filter(d => d.dateto == null)
-         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
-         .map(d => [d.code, d])
-    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
-  ];
-}
 const inck_prep = prepClassificator(inck_raw, "Загальні доходи");
 const kek_prep  = prepClassificator(kek_raw,  "Загальні видатки");
 const cfg = await FileAttachment("data/config.json").json();
@@ -146,29 +137,9 @@ withDownload(TrendsChart(trendData, selectCity, "Current surplus", "curr_surplus
 ---
 
 ```js
-// Build a flat synthetic classificator from Financial Model categories.
-// Income model categories get synthetic codes 1..N (positive FAKT_AMT).
-// Expense model categories get synthetic codes N+1..N+M (expenses negated so surplus = sum).
-// This lets the existing waterfall components display the breakdown at model-category level
-// rather than at individual budget code level.
-
 const modelIncCat = cfg.modelIncomeCategories;
 const modelExpCat = cfg.modelExpenseCategories;
-
-// Ordered unique category names
-const incCatNames = [...new Map(modelIncCat.map(d => [d.name, true])).keys()];
-const expCatNames = [...new Map(modelExpCat.map(d => [d.name, true])).keys()];
-
-// Assign synthetic integer codes
-const incCatCode = Object.fromEntries(incCatNames.map((n, i) => [n, i + 1]));
-const expCatCode = Object.fromEntries(expCatNames.map((n, i) => [n, incCatNames.length + i + 1]));
-
-// Flat 2-level hierarchy: root = "Current surplus", leaves = model categories
-const synth_table = [
-  {code: 0, parentCode: null, name: "Current surplus", level: 0},
-  ...incCatNames.map(n => ({code: incCatCode[n], parentCode: 0, name: n, level: 1})),
-  ...expCatNames.map(n => ({code: expCatCode[n], parentCode: 0, name: n, level: 1})),
-];
+const {incCatCode, expCatCode, synth_table, synth_table_hier} = buildSynthClassificator(modelIncCat, modelExpCat);
 
 // Pre-aggregate raw data into synthetic category codes.
 // Capital codes (capIncSet / capExpSet) are excluded.
@@ -188,7 +159,7 @@ for (const d of expenses_econ) {
 }
 ```
 
-```js
+<!-- ```js
 const cs_root = {code: 0, name: "Current surplus"};
 
 const curr_surplus_wf = prepareWaterfallData(
@@ -196,16 +167,81 @@ const curr_surplus_wf = prepareWaterfallData(
   selectCity, selectYear, month_max
 );
 display(withDownload(WaterfallChart(curr_surplus_wf, `Current surplus waterfall: ${selectCity} ${selectYear}`, d3.format(",d"), "UAH million"), `waterfall-${selectCity}-${selectYear}.png`))
-```
+``` -->
 
----
+_Click on bars to show breakdown_
 
 ```js
+const cs_root_hier = {code: 0, name: "Current surplus"};
+
+function computeLevel(parentCode, parentEntry) {
+  const selectCat = parentCode === 0
+    ? cs_root_hier
+    : {code: parentCode, name: parentEntry?.name ?? String(parentCode)};
+  return prepareWaterfallData(
+    synth_data, synth_table_hier, "COD", selectCat,
+    selectCity, selectYear, month_max
+  );
+}
+
+display(withDownload(
+  DrilldownWaterfallChart(computeLevel, synth_table_hier, {
+    title: `Current surplus: ${selectCity} ${selectYear}`,
+    fmt: d3.format(",d"),
+    yLabel: "UAH million",
+    width: 1152,
+    height: 500
+  }),
+  `waterfall-hierarchical-${selectCity}-${selectYear}.png`
+));
+```
+
+
+<!-- ```js
 const curr_surplus_wfd = prepareWaterfallComparisonData(
   synth_data, synth_table, "COD", cs_root,
   selectCity, selectYear, baseYear, month_max
 );
 display(withDownload(WaterfallComparisonChart(curr_surplus_wfd, `Current surplus change: ${selectCity} ${selectYear} vs ${baseYear}`, d3.format(",d"), "UAH million"), `waterfall-comparison-${selectCity}-${selectYear}-vs-${baseYear}.png`))
+``` -->
+
+_Click on bars to show breakdown_
+
+```js
+function computeLevelComparison(parentCode, parentEntry) {
+  const selectCat = parentCode === 0
+    ? cs_root_hier
+    : {code: parentCode, name: parentEntry?.name ?? String(parentCode)};
+  const data = prepareWaterfallComparisonData(
+    synth_data, synth_table_hier, "COD", selectCat,
+    selectCity, selectYear, baseYear, month_max
+  );
+  if (parentCode === 0) return data;
+  // Level 2+: drop base-year total, render as standard waterfall of deltas
+  // so the final total equals the parent's delta in level 1.
+  const deltas = data.slice(1, -1);
+  const totalKey = data.at(-1).key;
+  let accu = 0;
+  const out = deltas.map((d, i) => {
+    const prior = accu;
+    accu += d.value;
+    return {...d, prior, accu, nextKey: i < deltas.length - 1 ? deltas[i + 1].key : totalKey};
+  });
+  out.push({key: totalKey, value: accu, prior: 0, accu, nextKey: undefined});
+  return out;
+}
+
+display(withDownload(
+  DrilldownWaterfallChart(computeLevelComparison, synth_table_hier, {
+    title: `Current surplus change: ${selectCity} ${selectYear} vs ${baseYear}`,
+    fmt: d3.format(",d"),
+    yLabel: "UAH million",
+    width: 1152,
+    height: 500,
+    comparison: true
+  }),
+  `waterfall-hierarchical-comparison-${selectCity}-${selectYear}-vs-${baseYear}.png`
+));
 ```
 
 <div class="note">

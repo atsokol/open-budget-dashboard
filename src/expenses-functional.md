@@ -10,6 +10,7 @@ import * as d3 from "npm:d3";
 import {TrendsChart} from "./components/trends-chart.js";
 import {Icicle, IcicleDiff, get_treetab, get_treetab_diff} from "./components/icicle.js";
 import {withDownload} from "./components/chart-download.js";
+import {prepClassificator} from "./components/waterfall-data.js";
 
 const [fkv_raw, kekv_raw, expenses_func, expenses_func_econ] = await Promise.all([
   FileAttachment("data/classificators/FKV.json").json(),
@@ -29,16 +30,6 @@ const [fkv_raw, kekv_raw, expenses_func, expenses_func_econ] = await Promise.all
 ```
 
 ```js
-function prepClassificator(raw, rootName) {
-  return [
-    {code: "0", parentCode: null, name: rootName, level: 0},
-    ...Array.from(new Map(
-      raw.filter(d => d.dateto == null)
-         .map(d => ({code: String(d.code), parentCode: d.parentCode ? String(d.parentCode) : "0", name: d.name, level: d.level}))
-         .map(d => [d.code, d])
-    ).values()).sort((a, b) => Number(a.code) - Number(b.code))
-  ];
-}
 const fkv_prep  = prepClassificator(fkv_raw,  "Загальні видатки (функціональні)");
 const kekv_prep = prepClassificator(kekv_raw, "Загальні видатки");
 
